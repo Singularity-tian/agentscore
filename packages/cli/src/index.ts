@@ -20,11 +20,13 @@ program
   .option('-p, --path <path>', 'Path to session file or directory', '.')
   .option('-f, --format <format>', 'Output format: terminal, json, markdown', 'terminal')
   .option('-t, --threshold <score>', 'Minimum score threshold (exit 1 if below)', parseInt)
+  .option('--remote', 'POST to the dashboard API instead of scoring locally')
   .action(async (options) => {
     await checkCommand({
       path: options.path,
       format: options.format,
       threshold: options.threshold,
+      remote: options.remote,
     });
   });
 

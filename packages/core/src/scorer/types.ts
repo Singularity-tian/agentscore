@@ -8,6 +8,8 @@ export interface MatchedAction {
   actual: AgentAction;
   /** Match confidence (0-1) */
   confidence: number;
+  /** LLM explanation (only present for LLM scoring) */
+  reasoning?: string;
 }
 
 /** Result of truthfulness verification */
