@@ -19,6 +19,8 @@ export interface SessionResult {
   sessionId: string;
   /** Label given at creation time. */
   label: string;
+  /** Model identifier (e.g., "claude-sonnet-4-20250514"). */
+  model?: string;
   /** Recorded actions. */
   actions: AgentAction[];
   /** Alignment score computed by the core engine. */
@@ -111,6 +113,7 @@ export class AgentScoreSession {
     return {
       sessionId: this.sessionId,
       label: this.label,
+      model: this.model,
       actions: [...this.actions],
       score,
       startedAt: this.startedAt,

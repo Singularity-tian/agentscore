@@ -133,6 +133,23 @@ describe('AgentScoreSession', () => {
       expect(result.actions).toHaveLength(2); // mutated copy
     });
 
+    it('includes model in result when provided', () => {
+      const session = AgentScoreSession.startSession({
+        prompt: 'Do something.',
+        model: 'claude-sonnet-4-20250514',
+      });
+      const result = session.end();
+      expect(result.model).toBe('claude-sonnet-4-20250514');
+    });
+
+    it('result.model is undefined when not provided', () => {
+      const session = AgentScoreSession.startSession({
+        prompt: 'Do something.',
+      });
+      const result = session.end();
+      expect(result.model).toBeUndefined();
+    });
+
     it('computes missed instructions when no matching action exists', () => {
       const session = AgentScoreSession.startSession({
         prompt: 'Delete the old backups and send a report.',
