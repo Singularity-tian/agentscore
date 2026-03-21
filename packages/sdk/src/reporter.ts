@@ -2,10 +2,14 @@ import type { SessionResult } from './session.js';
 
 /** Configuration for the AgentScore reporter. */
 export interface ReporterOptions {
-  /** Base URL of the AgentScore dashboard API (e.g., "https://dashboard.agentscore.dev"). */
+  /** Base URL of the AgentScore dashboard (e.g., "https://getagentscore.com"). */
   dashboardUrl: string;
   /** API key used to authenticate with the dashboard. */
   apiKey: string;
+  /** Agent name used when reporting sessions (defaults to "unnamed-agent"). */
+  agentName?: string;
+  /** Agent framework identifier (defaults to "custom"). */
+  framework?: 'openclaw' | 'langchain' | 'crewai' | 'claude-code' | 'custom';
   /**
    * If `true`, errors during reporting are silently swallowed instead of
    * throwing.  Defaults to `false`.
@@ -28,6 +32,10 @@ export interface ReportResponse {
   ok: boolean;
   /** Dashboard-assigned identifier for the report. */
   reportId?: string;
+  /** Dashboard-assigned agent identifier. */
+  agentId?: string;
+  /** Alignment score returned by the dashboard. */
+  score?: number;
   /** Human-readable message from the server. */
   message?: string;
 }
@@ -37,8 +45,9 @@ export interface ReportResponse {
  *
  * ```ts
  * const reporter = new AgentScoreReporter({
- *   dashboardUrl: 'https://dashboard.agentscore.dev',
+ *   dashboardUrl: 'https://getagentscore.com',
  *   apiKey: process.env.AGENTSCORE_API_KEY!,
+ *   agentName: 'my-agent',
  * });
  * await reporter.report(sessionResult);
  * ```
@@ -46,6 +55,8 @@ export interface ReportResponse {
 export class AgentScoreReporter {
   private readonly dashboardUrl: string;
   private readonly apiKey: string;
+  private readonly agentName: string;
+  private readonly framework: string;
   private readonly silent: boolean;
   private readonly extraHeaders: Record<string, string>;
   private readonly timeoutMs: number;
@@ -61,6 +72,8 @@ export class AgentScoreReporter {
     // Trim trailing slash so we can append paths safely.
     this.dashboardUrl = options.dashboardUrl.replace(/\/+$/, '');
     this.apiKey = options.apiKey;
+    this.agentName = options.agentName ?? 'unnamed-agent';
+    this.framework = options.framework ?? 'custom';
     this.silent = options.silent ?? false;
     this.extraHeaders = options.headers ?? {};
     this.timeoutMs = options.timeoutMs ?? 10_000;
@@ -69,22 +82,49 @@ export class AgentScoreReporter {
   /**
    * Report a single session result to the dashboard.
    *
-   * Throws on network/server errors unless `silent` mode is enabled.
+   * Transforms the SDK's `SessionResult` into the flat format expected by
+   * `POST /api/sessions`.
    */
   async report(result: SessionResult): Promise<ReportResponse> {
-    return this.post('/api/v1/reports', result);
+    const payload = this.toIngestionPayload(result);
+    return this.post('/api/sessions', payload);
   }
 
   /**
    * Report multiple session results in one request (batch upload).
    */
   async reportBatch(results: SessionResult[]): Promise<ReportResponse> {
-    return this.post('/api/v1/reports/batch', { results });
+    const payloads = results.map((r) => this.toIngestionPayload(r));
+    return this.post('/api/sessions/batch', { sessions: payloads });
   }
 
   // ---------------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------------
+
+  /**
+   * Transform a `SessionResult` (nested score object) into the flat payload
+   * expected by the dashboard's `POST /api/sessions` endpoint.
+   */
+  private toIngestionPayload(result: SessionResult): Record<string, unknown> {
+    const { score } = result;
+    return {
+      agentName: this.agentName,
+      framework: this.framework,
+      startedAt: result.startedAt,
+      endedAt: result.endedAt,
+      alignmentScore: score.score,
+      truthfulnessScore: score.truthfulness,
+      totalExpected: score.matched.length + score.missed.length,
+      matchedActions: score.matched.length,
+      missedActions: score.missed.length,
+      unexpectedActions: score.unexpected.length,
+      model: result.model,
+      matchedDetails: score.matched,
+      missedDetails: score.missed,
+      unexpectedDetails: score.unexpected,
+    };
+  }
 
   private async post(path: string, body: unknown): Promise<ReportResponse> {
     const url = `${this.dashboardUrl}${path}`;
@@ -116,6 +156,8 @@ export class AgentScoreReporter {
       return {
         ok: true,
         reportId: typeof data.id === 'string' ? data.id : undefined,
+        agentId: typeof data.agentId === 'string' ? data.agentId : undefined,
+        score: typeof data.score === 'number' ? data.score : undefined,
         message: typeof data.message === 'string' ? data.message : undefined,
       };
     } catch (err) {
