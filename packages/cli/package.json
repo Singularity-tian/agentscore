@@ -1,0 +1,30 @@
+{
+  "name": "agentscore",
+  "version": "0.1.0",
+  "description": "CLI tool for scoring AI agent alignment",
+  "type": "module",
+  "bin": {
+    "agentscore": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentscore/core": "*",
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "vitest": "^3.0.0"
+  },
+  "license": "MIT"
+}

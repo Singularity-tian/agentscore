@@ -1,0 +1,17 @@
+{
+  "name": "@agentscore/openclaw-skill",
+  "version": "0.1.0",
+  "description": "AgentScore skill for OpenClaw",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "SKILL.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentscore/core": "*"
+  },
+  "license": "MIT"
+}

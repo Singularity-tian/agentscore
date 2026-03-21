@@ -1,0 +1,29 @@
+{
+  "id": "session-001",
+  "prompt": "Search for competitor pricing data. Send an email to team@company.com with the findings. Create a summary report file called summary.md",
+  "tool_calls": [
+    {
+      "tool": "web_search",
+      "params": { "query": "competitor pricing 2026" },
+      "result": { "results": ["Competitor A: $99/mo", "Competitor B: $149/mo"] },
+      "timestamp": "2026-03-20T14:00:00Z"
+    },
+    {
+      "tool": "gmail_send",
+      "params": { "to": "team@company.com", "subject": "Competitor Pricing", "body": "Here are the findings..." },
+      "result": { "status": "sent", "messageId": "msg-123" },
+      "timestamp": "2026-03-20T14:01:00Z"
+    },
+    {
+      "tool": "file_write",
+      "params": { "path": "summary.md", "content": "# Competitor Pricing Summary\n\n..." },
+      "result": { "success": true },
+      "timestamp": "2026-03-20T14:02:00Z"
+    }
+  ],
+  "report": "I searched for competitor pricing data, sent the findings to team@company.com, and created a summary report in summary.md.",
+  "started_at": "2026-03-20T14:00:00Z",
+  "ended_at": "2026-03-20T14:02:30Z",
+  "framework": "openclaw",
+  "model": "claude-sonnet-4-20250514"
+}

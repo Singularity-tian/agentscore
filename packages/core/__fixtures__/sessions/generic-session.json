@@ -1,0 +1,27 @@
+{
+  "id": "session-005",
+  "prompt": "Look up the latest stock prices for AAPL and GOOGL. Save the data to stocks.csv. Post the summary to the #finance Slack channel",
+  "actions": [
+    {
+      "name": "api_call",
+      "parameters": { "url": "https://api.stocks.com/prices", "symbols": ["AAPL", "GOOGL"] },
+      "output": { "AAPL": 195.50, "GOOGL": 178.20 },
+      "time": "2026-03-20T15:00:00Z"
+    },
+    {
+      "name": "file_write",
+      "parameters": { "path": "stocks.csv", "content": "Symbol,Price\nAAPL,195.50\nGOOGL,178.20" },
+      "output": { "success": true },
+      "time": "2026-03-20T15:01:00Z"
+    },
+    {
+      "name": "slack_post",
+      "parameters": { "channel": "#finance", "message": "Stock update: AAPL $195.50, GOOGL $178.20" },
+      "output": { "ok": true },
+      "time": "2026-03-20T15:02:00Z"
+    }
+  ],
+  "summary": "I looked up stock prices for AAPL ($195.50) and GOOGL ($178.20), saved the data to stocks.csv, and posted the summary to #finance on Slack.",
+  "started_at": "2026-03-20T15:00:00Z",
+  "ended_at": "2026-03-20T15:02:30Z"
+}
