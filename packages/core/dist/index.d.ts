@@ -1,5 +1,5 @@
 export type { AgentAction, PromptInstruction, Constraint, AgentSession, ScoringInput, } from './parser/types.js';
-export type { AlignmentScore, MatchedAction, TruthfulnessResult, TruthfulnessClaim, ConstraintViolation, DriftReport, DriftChange, } from './scorer/types.js';
+export type { AlignmentScore, MatchedAction, TruthfulnessResult, TruthfulnessClaim, ConstraintViolation, DriftReport, DriftChange, LlmJudgeLogs, } from './scorer/types.js';
 export type { LlmProvider, Schema } from './llm/types.js';
 export { createAnthropicProvider, type AnthropicProviderOptions } from './llm/anthropic.js';
 export type { Checkpoint, ExtractCheckpointsResponse, CheckpointVerification, VerifyCheckpointsResponse, ConstraintCheck, CheckConstraintsResponse, TruthfulnessClaim as LlmTruthfulnessClaim, VerifyTruthfulnessResponse, } from './scorer/llm-schemas.js';

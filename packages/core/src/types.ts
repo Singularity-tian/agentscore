@@ -14,4 +14,5 @@ export type {
   ConstraintViolation,
   DriftReport,
   DriftChange,
+  LlmJudgeLogs,
 } from './scorer/types.js';

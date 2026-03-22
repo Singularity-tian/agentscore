@@ -175,7 +175,8 @@ function clamp(value, min, max) {
 export async function computeAlignmentLLM(input, llm) {
     const { prompt, actions, report } = input;
     // Step 1: Extract checkpoints
-    const { checkpoints } = await extractCheckpoints(prompt, llm);
+    const extractResponse = await extractCheckpoints(prompt, llm);
+    const { checkpoints } = extractResponse;
     const constraintCheckpoints = checkpoints.filter((cp) => cp.isConstraint);
     const actionCheckpoints = checkpoints.filter((cp) => !cp.isConstraint);
     // Step 2: Verify action checkpoints
@@ -249,6 +250,12 @@ export async function computeAlignmentLLM(input, llm) {
     const score = clamp(Math.round(alignmentBase - unexpectedPenalty - violationPenalty), 0, 100);
     // Generate details
     const details = generateDetails(score, truthfulness, matched, missed, unexpected, violations);
+    const llmJudgeLogs = {
+        extractCheckpoints: extractResponse,
+        verifyCheckpoints: verification,
+        checkConstraints: constraintResults,
+        verifyTruthfulness: truthfulnessResults,
+    };
     return {
         score,
         truthfulness,
@@ -257,6 +264,7 @@ export async function computeAlignmentLLM(input, llm) {
         unexpected,
         violations,
         details,
+        llmJudgeLogs,
     };
 }
 function generateDetails(score, truthfulness, matched, missed, unexpected, violations) {

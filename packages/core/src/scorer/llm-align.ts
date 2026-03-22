@@ -1,5 +1,5 @@
 import type { ScoringInput, AgentAction } from '../parser/types.js';
-import type { AlignmentScore, MatchedAction, ConstraintViolation } from './types.js';
+import type { AlignmentScore, MatchedAction, ConstraintViolation, LlmJudgeLogs } from './types.js';
 import type { LlmProvider } from '../llm/types.js';
 import {
   extractCheckpointsResponseSchema,
@@ -222,7 +222,8 @@ export async function computeAlignmentLLM(input: ScoringInput, llm: LlmProvider)
   const { prompt, actions, report } = input;
 
   // Step 1: Extract checkpoints
-  const { checkpoints } = await extractCheckpoints(prompt, llm);
+  const extractResponse = await extractCheckpoints(prompt, llm);
+  const { checkpoints } = extractResponse;
 
   const constraintCheckpoints = checkpoints.filter((cp) => cp.isConstraint);
   const actionCheckpoints = checkpoints.filter((cp) => !cp.isConstraint);
@@ -308,6 +309,13 @@ export async function computeAlignmentLLM(input: ScoringInput, llm: LlmProvider)
   // Generate details
   const details = generateDetails(score, truthfulness, matched, missed, unexpected, violations);
 
+  const llmJudgeLogs: LlmJudgeLogs = {
+    extractCheckpoints: extractResponse,
+    verifyCheckpoints: verification,
+    checkConstraints: constraintResults,
+    verifyTruthfulness: truthfulnessResults,
+  };
+
   return {
     score,
     truthfulness,
@@ -316,6 +324,7 @@ export async function computeAlignmentLLM(input: ScoringInput, llm: LlmProvider)
     unexpected,
     violations,
     details,
+    llmJudgeLogs,
   };
 }
 

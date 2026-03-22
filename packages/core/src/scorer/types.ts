@@ -58,6 +58,52 @@ export interface AlignmentScore {
   violations: ConstraintViolation[];
   /** Human-readable summary */
   details: string;
+  /** Raw LLM judge responses (only present when LLM scoring is used) */
+  llmJudgeLogs?: LlmJudgeLogs;
+}
+
+/** Raw LLM judge pipeline responses, one per step */
+export interface LlmJudgeLogs {
+  /** Step 1: Extracted checkpoints from the prompt */
+  extractCheckpoints: {
+    checkpoints: Array<{
+      id: string;
+      description: string;
+      expectedTool?: string;
+      entities: string[];
+      isConstraint: boolean;
+      constraintType?: 'dont' | 'only' | 'limit' | null;
+    }>;
+  };
+  /** Step 2: Verification of action checkpoints */
+  verifyCheckpoints: {
+    results: Array<{
+      checkpointId: string;
+      passed: boolean;
+      confidence: number;
+      matchedActionIndex: number | null;
+      reasoning: string;
+    }>;
+  };
+  /** Step 3: Constraint compliance check */
+  checkConstraints: {
+    results: Array<{
+      checkpointId: string;
+      violated: boolean;
+      violatingActionIndex: number | null;
+      reasoning: string;
+    }>;
+  };
+  /** Step 4: Truthfulness verification */
+  verifyTruthfulness: {
+    claims: Array<{
+      claim: string;
+      verified: boolean;
+      matchedActionIndex: number | null;
+      confidence: number;
+      reasoning: string;
+    }>;
+  };
 }
 
 /** Drift analysis comparing current behavior to a baseline */
