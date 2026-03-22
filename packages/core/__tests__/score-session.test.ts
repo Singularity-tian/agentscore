@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { scoreSession } from '../src/score-session';
-import type { LlmProvider } from '../src/llm/types';
-import type { ScoringInput } from '../src/parser/types';
+import { scoreSession } from '../src/score-session.js';
+import type { LlmProvider, Schema } from '../src/llm/types.js';
+import type { ScoringInput } from '../src/parser/types.js';
 
 const input: ScoringInput = {
   prompt: 'Send an email to bob@example.com with the quarterly report.',
@@ -28,7 +28,7 @@ describe('scoreSession', () => {
     // Mock LLM provider that returns canned responses for each pipeline step
     const callCount = { value: 0 };
     const mockLlm: LlmProvider = {
-      async generateStructured(_prompt, schema) {
+      async generateStructured<T>(_prompt: string, schema: Schema<T>): Promise<T> {
         callCount.value++;
         const call = callCount.value;
 
