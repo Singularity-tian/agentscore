@@ -1,0 +1,1 @@
+{"version":3,"file":"score-session.d.ts","sourceRoot":"","sources":["../src/score-session.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,mBAAmB,CAAC;AACtD,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,mBAAmB,CAAC;AACxD,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,gBAAgB,CAAC;AAIlD;;;;;GAKG;AACH,wBAAsB,YAAY,CAChC,KAAK,EAAE,YAAY,EACnB,GAAG,CAAC,EAAE,WAAW,GAChB,OAAO,CAAC,cAAc,CAAC,CAKzB"}

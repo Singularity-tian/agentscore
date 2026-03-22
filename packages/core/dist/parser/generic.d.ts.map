@@ -1,0 +1,1 @@
+{"version":3,"file":"generic.d.ts","sourceRoot":"","sources":["../../src/parser/generic.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,YAAY,EAAe,MAAM,YAAY,CAAC;AAE5D;;;GAGG;AACH,wBAAsB,mBAAmB,CAAC,QAAQ,EAAE,MAAM,GAAG,OAAO,CAAC,YAAY,CAAC,CAIjF;AAED;;GAEG;AACH,wBAAsB,qBAAqB,CAAC,OAAO,EAAE,MAAM,GAAG,OAAO,CAAC,YAAY,EAAE,CAAC,CAiBpF"}

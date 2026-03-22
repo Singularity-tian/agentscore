@@ -1,6 +1,9 @@
 node_modules/
-dist/
+# dist/ — core dist is needed for git installs
 .turbo/
 *.tsbuildinfo
 .env
 .env.local
+packages/cli/dist/
+packages/sdk/dist/
+skills/*/dist/
