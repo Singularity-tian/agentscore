@@ -1,5 +1,6 @@
 import type { AgentAction, ScoringInput, AlignmentScore } from '@llmagentscore/core';
 import { computeAlignment } from '@llmagentscore/core';
+import * as logWriter from './log-writer.js';
 
 /** Configuration options for creating a session. */
 export interface SessionOptions {
@@ -23,6 +24,10 @@ export interface SessionResult {
   model?: string;
   /** Recorded actions. */
   actions: AgentAction[];
+  /** The original prompt given to the agent. */
+  prompt: string;
+  /** What the agent reported it did. */
+  report: string;
   /** Alignment score computed by the core engine. */
   score: AlignmentScore;
   /** ISO timestamp when the session started. */
@@ -63,6 +68,15 @@ export class AgentScoreSession {
     this.model = options.model;
     this.metadata = options.metadata ?? {};
     this.startedAt = new Date().toISOString();
+
+    logWriter.writePrompt(this.prompt);
+    logWriter.writeMetadata({
+      sessionId: this.sessionId,
+      label: this.label,
+      model: this.model,
+      metadata: this.metadata,
+      startedAt: this.startedAt,
+    });
   }
 
   /** Create and return a new session. */
@@ -81,10 +95,12 @@ export class AgentScoreSession {
         `Session ${this.sessionId} has already ended. Cannot record more actions.`,
       );
     }
-    this.actions.push({
+    const timestamped = {
       ...action,
       timestamp: action.timestamp ?? new Date().toISOString(),
-    });
+    };
+    this.actions.push(timestamped);
+    logWriter.appendAction(timestamped);
   }
 
   /**
@@ -115,6 +131,8 @@ export class AgentScoreSession {
       label: this.label,
       model: this.model,
       actions: [...this.actions],
+      prompt: this.prompt,
+      report,
       score,
       startedAt: this.startedAt,
       endedAt,

@@ -150,6 +150,33 @@ describe('AgentScoreSession', () => {
       expect(result.model).toBeUndefined();
     });
 
+    it('result.prompt equals the prompt passed to startSession()', () => {
+      const session = AgentScoreSession.startSession({
+        prompt: 'Book a flight to Tokyo.',
+      });
+      session.recordAction(makeAction('flight_search', { dest: 'Tokyo' }));
+      const result = session.end('Booked flight.');
+      expect(result.prompt).toBe('Book a flight to Tokyo.');
+    });
+
+    it('result.report equals the report string passed to end()', () => {
+      const session = AgentScoreSession.startSession({
+        prompt: 'Send an email.',
+      });
+      session.recordAction(makeAction('gmail_send', { to: 'bob@test.com' }));
+      const result = session.end('I sent the email to Bob.');
+      expect(result.report).toBe('I sent the email to Bob.');
+    });
+
+    it('result.report defaults to empty string when end() called without argument', () => {
+      const session = AgentScoreSession.startSession({
+        prompt: 'Do something.',
+      });
+      session.recordAction(makeAction('noop'));
+      const result = session.end();
+      expect(result.report).toBe('');
+    });
+
     it('computes missed instructions when no matching action exists', () => {
       const session = AgentScoreSession.startSession({
         prompt: 'Delete the old backups and send a report.',

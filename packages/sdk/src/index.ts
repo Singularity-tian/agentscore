@@ -18,6 +18,9 @@ export type {
 export { AgentScoreReporter } from './reporter.js';
 export type { ReporterOptions, ReportResponse } from './reporter.js';
 
+// Log writer (CLI wrapper anti-tampering)
+export * as logWriter from './log-writer.js';
+
 // Middleware
 export { agentScoreMiddleware } from './middleware.js';
 export type {

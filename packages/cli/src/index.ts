@@ -5,6 +5,7 @@ import { diffCommand } from './commands/diff.js';
 import { driftCommand } from './commands/drift.js';
 import { syncCommand } from './commands/sync.js';
 import { watchCommand } from './commands/watch.js';
+import { wrapCommand } from './commands/wrap.js';
 import { configCommand } from './commands/config.js';
 
 const program = new Command();
@@ -87,6 +88,30 @@ program
     await watchCommand({
       command,
       output: options.output,
+    });
+  });
+
+program
+  .command('wrap')
+  .description('Wrap an agent process with tamper-proof action logging and server-side scoring')
+  .requiredOption('-p, --prompt <prompt>', 'The prompt given to the agent (trusted, developer-supplied)')
+  .option('--agent-name <name>', 'Agent name for the dashboard', 'unnamed-agent')
+  .option('--framework <framework>', 'Agent framework identifier', 'custom')
+  .option('--model <model>', 'Model identifier')
+  .option('-f, --format <format>', 'Output format: terminal, json', 'terminal')
+  .option('--no-upload', 'Score locally instead of uploading to the dashboard')
+  .option('-o, --output <dir>', 'Output directory for local results')
+  .argument('<command...>', 'Command to run')
+  .action(async (command, options) => {
+    await wrapCommand({
+      prompt: options.prompt,
+      agentName: options.agentName,
+      framework: options.framework,
+      model: options.model,
+      format: options.format,
+      noUpload: options.upload === false,
+      output: options.output,
+      command,
     });
   });
 

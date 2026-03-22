@@ -26,22 +26,33 @@ export interface ReporterOptions {
   timeoutMs?: number;
 }
 
-/** Minimal response returned after a successful report. */
+/** Response returned after a successful report to `/api/v1/score`. */
 export interface ReportResponse {
   /** Whether the dashboard accepted the report. */
   ok: boolean;
-  /** Dashboard-assigned identifier for the report. */
+  /** Dashboard-assigned session identifier. */
   reportId?: string;
   /** Dashboard-assigned agent identifier. */
   agentId?: string;
-  /** Alignment score returned by the dashboard. */
-  score?: number;
+  /** Server-computed alignment score. */
+  alignmentScore?: number;
+  /** Server-computed truthfulness score. */
+  truthfulnessScore?: number;
+  /** Scoring detail breakdown from the server. */
+  details?: string;
+  /** Whether the session was skipped (duplicate). */
+  skipped?: boolean;
   /** Human-readable message from the server. */
   message?: string;
 }
 
 /**
- * HTTP client that POSTs scored session results to the AgentScore dashboard.
+ * HTTP client that POSTs raw session data to the AgentScore dashboard's
+ * server-side scoring endpoint (`/api/v1/score`).
+ *
+ * The server re-computes alignment scores — the SDK no longer uploads
+ * pre-computed scores, closing the trust gap where an agent could fabricate
+ * its own score.
  *
  * ```ts
  * const reporter = new AgentScoreReporter({
@@ -82,49 +93,51 @@ export class AgentScoreReporter {
   /**
    * Report a single session result to the dashboard.
    *
-   * Transforms the SDK's `SessionResult` into the flat format expected by
-   * `POST /api/sessions`.
+   * Sends raw actions + prompt to `/api/v1/score` for server-side scoring.
    */
   async report(result: SessionResult): Promise<ReportResponse> {
-    const payload = this.toIngestionPayload(result);
-    return this.post('/api/sessions', payload);
+    const payload = {
+      agentName: this.agentName,
+      prompt: result.prompt,
+      actions: result.actions,
+      report: result.report,
+      startedAt: result.startedAt,
+      endedAt: result.endedAt,
+      framework: this.framework,
+      model: result.model,
+      source: 'sdk' as const,
+    };
+    return this.post('/api/v1/score', payload);
   }
 
   /**
    * Report multiple session results in one request (batch upload).
+   *
+   * Sends to `/api/v1/score` using the batch format.
    */
   async reportBatch(results: SessionResult[]): Promise<ReportResponse> {
-    const payloads = results.map((r) => this.toIngestionPayload(r));
-    return this.post('/api/sessions/batch', { sessions: payloads });
+    const tasks = results.map((r) => ({
+      prompt: r.prompt,
+      actions: r.actions,
+      report: r.report,
+      startedAt: r.startedAt,
+      endedAt: r.endedAt,
+      model: r.model,
+    }));
+
+    const payload = {
+      agentName: this.agentName,
+      framework: this.framework,
+      source: 'sdk' as const,
+      tasks,
+    };
+
+    return this.post('/api/v1/score', payload);
   }
 
   // ---------------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------------
-
-  /**
-   * Transform a `SessionResult` (nested score object) into the flat payload
-   * expected by the dashboard's `POST /api/sessions` endpoint.
-   */
-  private toIngestionPayload(result: SessionResult): Record<string, unknown> {
-    const { score } = result;
-    return {
-      agentName: this.agentName,
-      framework: this.framework,
-      startedAt: result.startedAt,
-      endedAt: result.endedAt,
-      alignmentScore: score.score,
-      truthfulnessScore: score.truthfulness,
-      totalExpected: score.matched.length + score.missed.length,
-      matchedActions: score.matched.length,
-      missedActions: score.missed.length,
-      unexpectedActions: score.unexpected.length,
-      model: result.model,
-      matchedDetails: score.matched,
-      missedDetails: score.missed,
-      unexpectedDetails: score.unexpected,
-    };
-  }
 
   private async post(path: string, body: unknown): Promise<ReportResponse> {
     const url = `${this.dashboardUrl}${path}`;
@@ -157,7 +170,10 @@ export class AgentScoreReporter {
         ok: true,
         reportId: typeof data.id === 'string' ? data.id : undefined,
         agentId: typeof data.agentId === 'string' ? data.agentId : undefined,
-        score: typeof data.score === 'number' ? data.score : undefined,
+        alignmentScore: typeof data.alignmentScore === 'number' ? data.alignmentScore : undefined,
+        truthfulnessScore: typeof data.truthfulnessScore === 'number' ? data.truthfulnessScore : undefined,
+        details: typeof data.details === 'string' ? data.details : undefined,
+        skipped: typeof data.skipped === 'boolean' ? data.skipped : undefined,
         message: typeof data.message === 'string' ? data.message : undefined,
       };
     } catch (err) {
