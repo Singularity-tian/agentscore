@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AgentScoreSession } from '../src/session.js';
-import type { AgentAction } from '@agentscore/core';
+import type { AgentAction } from '@llmagentscore/core';
 
 function makeAction(tool: string, params: Record<string, unknown> = {}): AgentAction {
   return { tool, params, timestamp: new Date().toISOString() };

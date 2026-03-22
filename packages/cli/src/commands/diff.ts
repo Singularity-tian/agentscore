@@ -8,7 +8,7 @@ import {
   parsePrompt,
   matchScore,
   type AgentSession,
-} from '@agentscore/core';
+} from '@llmagentscore/core';
 
 export interface DiffOptions {
   path?: string;

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import type { AlignmentScore } from '@agentscore/core';
+import type { AlignmentScore } from '@llmagentscore/core';
 
 /**
  * Format alignment score as a colored terminal report.

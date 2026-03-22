@@ -1,5 +1,5 @@
-import type { AgentAction, ScoringInput, AlignmentScore } from '@agentscore/core';
-import { computeAlignment } from '@agentscore/core';
+import type { AgentAction, ScoringInput, AlignmentScore } from '@llmagentscore/core';
+import { computeAlignment } from '@llmagentscore/core';
 
 /** Configuration options for creating a session. */
 export interface SessionOptions {

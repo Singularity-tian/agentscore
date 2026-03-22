@@ -8,7 +8,7 @@ import {
   type AgentSession,
   type AlignmentScore,
   type LlmProvider,
-} from '@agentscore/core';
+} from '@llmagentscore/core';
 import { formatTerminal } from '../output/terminal.js';
 import { formatJson } from '../output/json.js';
 import { formatMarkdown } from '../output/markdown.js';

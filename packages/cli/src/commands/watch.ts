@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import {
   computeAlignment,
   type AgentAction,
-} from '@agentscore/core';
+} from '@llmagentscore/core';
 
 export interface WatchOptions {
   command: string[];

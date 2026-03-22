@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { agentScoreMiddleware } from '../src/middleware.js';
 import type { GenericRequest, GenericResponse, NextFunction, ScoredRequest } from '../src/middleware.js';
-import type { AgentAction, AlignmentScore } from '@agentscore/core';
+import type { AgentAction, AlignmentScore } from '@llmagentscore/core';
 
 // ---------------------------------------------------------------------------
 // Helpers

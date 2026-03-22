@@ -1,4 +1,4 @@
-import type { AlignmentScore, MatchedAction, ConstraintViolation } from '@agentscore/core';
+import type { AlignmentScore, MatchedAction, ConstraintViolation } from '@llmagentscore/core';
 
 /**
  * Options for controlling report formatting.

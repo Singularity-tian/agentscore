@@ -1,4 +1,4 @@
-import type { AgentAction } from '@agentscore/core';
+import type { AgentAction } from '@llmagentscore/core';
 
 /** Well-known LLM provider API host patterns. */
 const LLM_HOST_PATTERNS: RegExp[] = [

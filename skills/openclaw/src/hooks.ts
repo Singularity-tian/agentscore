@@ -3,7 +3,7 @@ import {
   type AgentSession,
   type AlignmentScore,
   type ScoringInput,
-} from '@agentscore/core';
+} from '@llmagentscore/core';
 import { formatReport } from './report.js';
 
 /**

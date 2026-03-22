@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agentscore/core": "*"
+    "@llmagentscore/core": "*"
   },
   "license": "MIT"
 }

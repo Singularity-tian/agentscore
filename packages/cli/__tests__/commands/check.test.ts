@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AlignmentScore } from '@agentscore/core';
+import type { AlignmentScore } from '@llmagentscore/core';
 import { formatTerminal } from '../../src/output/terminal.js';
 import { formatJson } from '../../src/output/json.js';
 import { formatMarkdown } from '../../src/output/markdown.js';

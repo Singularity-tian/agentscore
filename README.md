@@ -16,7 +16,7 @@ AgentScore compares **what the user asked** (prompt) → **what the agent did** 
 
 | Package | Description |
 |---------|-------------|
-| [`@agentscore/core`](packages/core) | Scoring engine — pure functions, zero runtime deps |
+| [`@llmagentscore/core`](packages/core) | Scoring engine — pure functions, zero runtime deps |
 | [`agentscore`](packages/cli) | CLI for scoring sessions from the terminal |
 | [`@agentscore/sdk`](packages/sdk) | SDK for integrating scoring into custom agents |
 | [`@agentscore/openclaw-skill`](skills/openclaw) | OpenClaw framework skill |
@@ -131,7 +131,7 @@ app.use(agentScoreMiddleware({
 ## Core API
 
 ```typescript
-import { computeAlignment, parsePrompt } from '@agentscore/core';
+import { computeAlignment, parsePrompt } from '@llmagentscore/core';
 
 const result = computeAlignment({
   prompt: 'Send an email to bob@example.com and search the web for weather',

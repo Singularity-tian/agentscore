@@ -35,6 +35,6 @@ export type {
   AlignmentScore,
   MatchedAction,
   ConstraintViolation,
-} from '@agentscore/core';
+} from '@llmagentscore/core';
 
-export { computeAlignment } from '@agentscore/core';
+export { computeAlignment } from '@llmagentscore/core';

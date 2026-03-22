@@ -8,7 +8,7 @@ import {
   computeDrift,
   computeAlignment,
   type AgentSession,
-} from '@agentscore/core';
+} from '@llmagentscore/core';
 
 export interface DriftOptions {
   path?: string;

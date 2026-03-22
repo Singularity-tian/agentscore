@@ -1,5 +1,5 @@
-import type { AgentAction, AlignmentScore } from '@agentscore/core';
-import { computeAlignment } from '@agentscore/core';
+import type { AgentAction, AlignmentScore } from '@llmagentscore/core';
+import { computeAlignment } from '@llmagentscore/core';
 
 // ---------------------------------------------------------------------------
 // Generic request / response types (no express or fastify type imports)

@@ -1,4 +1,4 @@
-import type { AlignmentScore } from '@agentscore/core';
+import type { AlignmentScore } from '@llmagentscore/core';
 
 /**
  * Format an alignment score as JSON output.

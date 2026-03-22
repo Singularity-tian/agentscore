@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { AlignmentScore, MatchedAction, ConstraintViolation } from '@agentscore/core';
+import type { AlignmentScore, MatchedAction, ConstraintViolation } from '@llmagentscore/core';
 import { formatJson } from '../../src/output/json.js';
 
 function makeAction(tool: string, params: Record<string, unknown> = {}) {

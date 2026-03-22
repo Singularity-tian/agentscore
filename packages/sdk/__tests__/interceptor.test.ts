@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { installInterceptor } from '../src/interceptor.js';
-import type { AgentAction } from '@agentscore/core';
+import type { AgentAction } from '@llmagentscore/core';
 
 // ---------------------------------------------------------------------------
 // Helpers
