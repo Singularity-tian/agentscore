@@ -1,18 +1,16 @@
 {
-  "name": "@llmagentscore/openclaw-hook",
+  "name": "@llmagentscore/openclaw-plugin",
   "version": "0.1.0",
-  "description": "AgentScore hook for OpenClaw — alignment verification on message:sent",
+  "description": "AgentScore plugin for OpenClaw — alignment verification on message:sent",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "HOOK.md"
+    "openclaw.plugin.json"
   ],
   "openclaw": {
-    "hooks": [
-      "./"
-    ]
+    "extensions": ["./dist/plugin.js"]
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

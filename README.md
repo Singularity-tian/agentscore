@@ -19,7 +19,7 @@ AgentScore compares **what the user asked** (prompt) → **what the agent did** 
 | [`@llmagentscore/core`](packages/core) | Scoring engine — pure functions, zero runtime deps |
 | [`agentscore`](packages/cli) | CLI for scoring sessions from the terminal |
 | [`@llmagentscore/sdk`](packages/sdk) | SDK for integrating scoring into custom agents |
-| [`@llmagentscore/openclaw-hook`](skills/openclaw) | OpenClaw framework hook |
+| [`@llmagentscore/openclaw-plugin`](plugins/openclaw) | OpenClaw plugin |
 
 ## Quick Start
 
@@ -184,8 +184,8 @@ agentscore/
 │   │       └── utils/      # TF-IDF, entity extraction, tool-verb mapping
 │   ├── cli/            # Terminal commands (check, diff, drift, sync, watch)
 │   └── sdk/            # Session tracking, fetch interceptor, reporter, middleware
-└── skills/
-    └── openclaw/       # OpenClaw framework hook
+└── plugins/
+    └── openclaw/       # OpenClaw plugin
 ```
 
 ## License

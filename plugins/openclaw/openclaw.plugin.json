@@ -1,0 +1,45 @@
+{
+  "id": "agentscore",
+  "name": "AgentScore",
+  "description": "Alignment verification — scores how faithfully the agent followed instructions and uploads results to AgentScore dashboard",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiKey": {
+        "type": "string",
+        "description": "API key for the AgentScore dashboard. Enables remote upload."
+      },
+      "threshold": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "default": 70,
+        "description": "Minimum acceptable alignment score (0-100)."
+      },
+      "throttleMs": {
+        "type": "number",
+        "minimum": 0,
+        "default": 180000,
+        "description": "Minimum interval (ms) between scoring per session."
+      },
+      "verbose": {
+        "type": "boolean",
+        "default": false,
+        "description": "Include per-action match details in the report."
+      },
+      "dashboardUrl": {
+        "type": "string",
+        "default": "https://getagentscore.com",
+        "description": "Base URL for the AgentScore API."
+      }
+    }
+  },
+  "uiHints": {
+    "apiKey": {
+      "label": "API key",
+      "placeholder": "sk-...",
+      "sensitive": true
+    }
+  }
+}

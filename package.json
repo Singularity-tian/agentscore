@@ -2,7 +2,7 @@
   "name": "agentscore-monorepo",
   "private": true,
   "packageManager": "npm@10.8.0",
-  "workspaces": ["packages/*", "skills/*"],
+  "workspaces": ["packages/*", "plugins/*"],
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
