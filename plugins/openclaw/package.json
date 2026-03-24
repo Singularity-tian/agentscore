@@ -19,5 +19,18 @@
   "dependencies": {
     "@llmagentscore/core": "*"
   },
+  "peerDependencies": {
+    "openclaw": ">=2026.1.29"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "openclaw": "2026.3.23-2",
+    "vitest": "^3.0.0"
+  },
   "license": "MIT"
 }
