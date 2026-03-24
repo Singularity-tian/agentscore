@@ -27,22 +27,102 @@ interface AgentEndContext {
   channelId?: string;
 }
 
+// Extract text from a content block or string
+// 从 content block 或字符串中提取文本
+function extractText(content: unknown): string | null {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (typeof block === "object" && block !== null && "text" in block) {
+        return (block as { text: string }).text;
+      }
+    }
+  }
+  return null;
+}
+
 // Extract first user prompt text from messages array
 // 从 messages 数组中提取第一条用户 prompt
 function extractPrompt(messages?: AgentEndEvent["messages"]): string {
   if (!messages?.length) return "(no prompt)";
   for (const msg of messages) {
     if (msg.role !== "user") continue;
-    if (typeof msg.content === "string") return msg.content;
-    if (Array.isArray(msg.content)) {
+    const text = extractText(msg.content);
+    if (text) return text;
+  }
+  return "(no prompt)";
+}
+
+// Extract assistant's last text reply as report
+// 提取 assistant 最后一条文本回复作为 report
+function extractReport(messages?: AgentEndEvent["messages"]): string {
+  if (!messages?.length) return "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== "assistant") continue;
+    const text = extractText(messages[i].content);
+    if (text) return text;
+  }
+  return "";
+}
+
+// Extract tool calls from messages as AgentAction[]
+// 从 messages 中提取 tool 调用作为 AgentAction[]
+function extractActions(messages?: AgentEndEvent["messages"]): Array<{
+  tool: string;
+  params: Record<string, unknown>;
+  result?: unknown;
+  timestamp: string;
+}> {
+  if (!messages?.length) return [];
+  const actions: Array<{
+    tool: string;
+    params: Record<string, unknown>;
+    result?: unknown;
+    timestamp: string;
+  }> = [];
+
+  // Collect tool_use blocks from assistant messages
+  // 从 assistant 消息中收集 tool_use blocks
+  const pendingTools = new Map<string, { tool: string; params: Record<string, unknown>; result?: unknown; timestamp: string }>();
+
+  for (const msg of messages) {
+    const timestamp = typeof (msg as any).timestamp === "number"
+      ? new Date((msg as any).timestamp).toISOString()
+      : new Date().toISOString();
+
+    // Match toolCall blocks (OpenClaw uses "toolCall" not "tool_use")
+    // 匹配 toolCall blocks（OpenClaw 使用 "toolCall" 而非 "tool_use"）
+    if (msg.role === "assistant" && Array.isArray(msg.content)) {
       for (const block of msg.content) {
-        if (typeof block === "object" && block !== null && "text" in block) {
-          return (block as { text: string }).text;
+        const b = block as Record<string, unknown>;
+        if ((b.type === "toolCall" || b.type === "tool_use") && typeof b.name === "string") {
+          const entry: { tool: string; params: Record<string, unknown>; result?: unknown; timestamp: string } = {
+            tool: b.name,
+            params: (b.input as Record<string, unknown>) ?? (b.params as Record<string, unknown>) ?? {},
+            timestamp,
+          };
+          const id = (b.id ?? b.toolCallId) as string | undefined;
+          if (id) pendingTools.set(id, entry);
+          actions.push(entry);
+        }
+      }
+    }
+
+    // Match toolResult messages (OpenClaw uses role="toolResult")
+    // 匹配 toolResult 消息（OpenClaw 使用 role="toolResult"）
+    if ((msg.role === "toolResult" || msg.role === "tool") && Array.isArray(msg.content)) {
+      const resultId = (msg as any).toolCallId ?? (msg as any).tool_use_id;
+      if (typeof resultId === "string") {
+        const pending = pendingTools.get(resultId);
+        if (pending) {
+          const text = extractText(msg.content);
+          pending.result = text ?? msg.content;
         }
       }
     }
   }
-  return "(no prompt)";
+
+  return actions;
 }
 
 /** Default request timeout in milliseconds. */
@@ -170,6 +250,14 @@ export default {
       const sessionKey = ctx.sessionKey ?? "unknown";
       const prompt = extractPrompt(event.messages);
       console.log(`[agentscore] agent_end fired, sessionKey=${sessionKey}, success=${event.success}`);
+      // Debug: dump message roles and content block types
+      // 调试：输出消息角色和 content block 类型
+      for (const msg of event.messages ?? []) {
+        const types = Array.isArray(msg.content)
+          ? (msg.content as Array<Record<string, unknown>>).map(b => b.type).join(",")
+          : typeof msg.content;
+        console.log(`[agentscore] msg role=${msg.role} contentTypes=${types}`);
+      }
 
       if (!event.success) return;
 
@@ -179,11 +267,15 @@ export default {
 
       // Build session from event + context
       // 从 event 和 context 构建 session
+      const actions = extractActions(event.messages);
+      const report = extractReport(event.messages);
+      console.log(`[agentscore] extracted ${actions.length} actions, report length=${report.length}`);
+
       const session: AgentSession = {
         id: ctx.sessionId ?? sessionKey,
         prompt,
-        actions: [],
-        report: "",
+        actions,
+        report,
         startedAt: new Date(now - (event.durationMs ?? 0)).toISOString(),
         endedAt: new Date(now).toISOString(),
         framework: "openclaw",
