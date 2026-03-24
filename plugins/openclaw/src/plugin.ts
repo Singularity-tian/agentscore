@@ -6,16 +6,43 @@ import {
 } from "@llmagentscore/core";
 import { formatReport } from "./report.js";
 
-// Typed plugin hook event shape for agent_end
-// agent_end typed plugin hook 事件结构
+// agent_end hook event (first argument)
+// agent_end hook 事件（第一个参数）
 interface AgentEndEvent {
-  sessionKey?: string;
-  agentId?: string;
-  model?: string;
-  durationMs?: number;
+  messages?: Array<{ role: string; content: unknown }>;
   success?: boolean;
   error?: string;
-  [key: string]: unknown;
+  durationMs?: number;
+}
+
+// agent_end hook context (second argument)
+// agent_end hook 上下文（第二个参数）
+interface AgentEndContext {
+  agentId?: string;
+  sessionKey?: string;
+  sessionId?: string;
+  workspaceDir?: string;
+  messageProvider?: string;
+  trigger?: string;
+  channelId?: string;
+}
+
+// Extract first user prompt text from messages array
+// 从 messages 数组中提取第一条用户 prompt
+function extractPrompt(messages?: AgentEndEvent["messages"]): string {
+  if (!messages?.length) return "(no prompt)";
+  for (const msg of messages) {
+    if (msg.role !== "user") continue;
+    if (typeof msg.content === "string") return msg.content;
+    if (Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (typeof block === "object" && block !== null && "text" in block) {
+          return (block as { text: string }).text;
+        }
+      }
+    }
+  }
+  return "(no prompt)";
 }
 
 /** Default request timeout in milliseconds. */
@@ -71,7 +98,7 @@ export async function uploadToRemote(
     endedAt: session.endedAt ?? new Date().toISOString(),
     framework: session.framework ?? "openclaw",
     model: session.model,
-    source: "hook" as const,
+    source: "sdk" as const,
   };
 
   const controller = new AbortController();
@@ -139,25 +166,28 @@ export default {
 
     // Use api.on() for typed plugin hooks (works for both webchat and channels)
     // 使用 api.on() 注册 typed plugin hook（webchat 和 channel 都会触发）
-    (api as any).on("agent_end", async (event: AgentEndEvent) => {
-      const sessionKey = event.sessionKey ?? "unknown";
-      console.log(`[agentscore] agent_end fired, sessionKey=${sessionKey}`);
+    (api as any).on("agent_end", async (event: AgentEndEvent, ctx: AgentEndContext) => {
+      const sessionKey = ctx.sessionKey ?? "unknown";
+      const prompt = extractPrompt(event.messages);
+      console.log(`[agentscore] agent_end fired, sessionKey=${sessionKey}, success=${event.success}`);
+
+      if (!event.success) return;
 
       const now = Date.now();
       const last = lastUploadAt.get(sessionKey) ?? 0;
       if (now - last < cfg.throttleMs) return;
 
-      // Build a minimal session from the agent_end event
-      // 从 agent_end 事件构建最小 session
+      // Build session from event + context
+      // 从 event 和 context 构建 session
       const session: AgentSession = {
-        id: sessionKey,
-        prompt: "",
+        id: ctx.sessionId ?? sessionKey,
+        prompt,
         actions: [],
         report: "",
         startedAt: new Date(now - (event.durationMs ?? 0)).toISOString(),
         endedAt: new Date(now).toISOString(),
         framework: "openclaw",
-        model: event.model ?? "",
+        model: "",
       };
 
       const uploadPromise = cfg.apiKey
