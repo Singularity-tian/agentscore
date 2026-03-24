@@ -116,6 +116,7 @@ function extractActions(messages?: AgentEndEvent["messages"]): Array<{
           } = {
             tool: b.name,
             params:
+              (b.arguments as Record<string, unknown>) ??
               (b.input as Record<string, unknown>) ??
               (b.params as Record<string, unknown>) ??
               {},
