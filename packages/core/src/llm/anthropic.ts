@@ -38,7 +38,6 @@ export function createAnthropicProvider(options?: AnthropicProviderOptions): Llm
 
   async function getClient(): Promise<unknown> {
     if (!clientPromise) {
-      // @ts-expect-error — optional peer dependency, may not be installed
       clientPromise = import('@anthropic-ai/sdk').then(
         (mod: { default: new (opts: { apiKey: string }) => unknown }) =>
           new mod.default({ apiKey }),
