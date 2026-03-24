@@ -171,6 +171,7 @@ export default {
 
         event.messages.push(result.report + warning);
       },
+      { name: "agentscore-alignment" },
     );
   },
 };
