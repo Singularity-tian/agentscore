@@ -5,21 +5,21 @@ export declare const checkpointSchema: z.ZodObject<{
     expectedTool: z.ZodOptional<z.ZodString>;
     entities: z.ZodArray<z.ZodString, "many">;
     isConstraint: z.ZodBoolean;
-    constraintType: z.ZodOptional<z.ZodNullable<z.ZodEnum<["dont", "only", "limit"]>>>;
+    constraintType: z.ZodEffects<z.ZodOptional<z.ZodNullable<z.ZodString>>, "dont" | "only" | "limit" | null, string | null | undefined>;
 }, "strip", z.ZodTypeAny, {
     id: string;
     description: string;
     entities: string[];
     isConstraint: boolean;
+    constraintType: "dont" | "only" | "limit" | null;
     expectedTool?: string | undefined;
-    constraintType?: "dont" | "only" | "limit" | null | undefined;
 }, {
     id: string;
     description: string;
     entities: string[];
     isConstraint: boolean;
     expectedTool?: string | undefined;
-    constraintType?: "dont" | "only" | "limit" | null | undefined;
+    constraintType?: string | null | undefined;
 }>;
 export declare const extractCheckpointsResponseSchema: z.ZodObject<{
     checkpoints: z.ZodArray<z.ZodObject<{
@@ -28,21 +28,21 @@ export declare const extractCheckpointsResponseSchema: z.ZodObject<{
         expectedTool: z.ZodOptional<z.ZodString>;
         entities: z.ZodArray<z.ZodString, "many">;
         isConstraint: z.ZodBoolean;
-        constraintType: z.ZodOptional<z.ZodNullable<z.ZodEnum<["dont", "only", "limit"]>>>;
+        constraintType: z.ZodEffects<z.ZodOptional<z.ZodNullable<z.ZodString>>, "dont" | "only" | "limit" | null, string | null | undefined>;
     }, "strip", z.ZodTypeAny, {
         id: string;
         description: string;
         entities: string[];
         isConstraint: boolean;
+        constraintType: "dont" | "only" | "limit" | null;
         expectedTool?: string | undefined;
-        constraintType?: "dont" | "only" | "limit" | null | undefined;
     }, {
         id: string;
         description: string;
         entities: string[];
         isConstraint: boolean;
         expectedTool?: string | undefined;
-        constraintType?: "dont" | "only" | "limit" | null | undefined;
+        constraintType?: string | null | undefined;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     checkpoints: {
@@ -50,8 +50,8 @@ export declare const extractCheckpointsResponseSchema: z.ZodObject<{
         description: string;
         entities: string[];
         isConstraint: boolean;
+        constraintType: "dont" | "only" | "limit" | null;
         expectedTool?: string | undefined;
-        constraintType?: "dont" | "only" | "limit" | null | undefined;
     }[];
 }, {
     checkpoints: {
@@ -60,7 +60,7 @@ export declare const extractCheckpointsResponseSchema: z.ZodObject<{
         entities: string[];
         isConstraint: boolean;
         expectedTool?: string | undefined;
-        constraintType?: "dont" | "only" | "limit" | null | undefined;
+        constraintType?: string | null | undefined;
     }[];
 }>;
 export type Checkpoint = z.infer<typeof checkpointSchema>;

@@ -6,7 +6,22 @@ export const checkpointSchema = z.object({
     expectedTool: z.string().optional(),
     entities: z.array(z.string()),
     isConstraint: z.boolean(),
-    constraintType: z.enum(['dont', 'only', 'limit']).nullable().optional(),
+    constraintType: z
+        .string()
+        .nullable()
+        .optional()
+        .transform((v) => {
+        if (v == null)
+            return null;
+        const lower = v.toLowerCase();
+        if (['dont', 'never', 'avoid', 'prohibit'].includes(lower))
+            return 'dont';
+        if (['only', 'exclusively'].includes(lower))
+            return 'only';
+        if (['limit', 'at_most', 'max'].includes(lower))
+            return 'limit';
+        return 'dont'; // safe fallback for any constraint
+    }),
 });
 export const extractCheckpointsResponseSchema = z.object({
     checkpoints: z.array(checkpointSchema),
