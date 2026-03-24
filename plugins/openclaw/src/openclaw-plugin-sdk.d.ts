@@ -19,7 +19,7 @@ declare module "openclaw/plugin-sdk" {
     config: Record<string, unknown>;
     registerHook(
       events: string | string[],
-      handler: (event: HookEvent) => void | Promise<void>,
+      handler: (...args: unknown[]) => void | Promise<void>,
       opts?: Record<string, unknown>,
     ): void;
   }

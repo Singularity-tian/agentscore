@@ -6,12 +6,12 @@ import {
 } from "@llmagentscore/core";
 import { formatReport } from "./report.js";
 
+// Internal hook event shape for message:sent
+// message:sent 内部 hook 事件结构
 interface HookEvent {
   type: string;
   action: string;
   sessionKey: string;
-  timestamp: Date;
-  messages: string[];
   context: Record<string, unknown>;
 }
 
@@ -131,29 +131,36 @@ export default {
   name: "AgentScore",
   description: "Alignment verification — scores agent alignment and uploads to dashboard",
   register(api: OpenClawPluginApi) {
+    console.log("[agentscore] register() called, pluginConfig:", JSON.stringify(api.pluginConfig ?? {}));
     const cfg = resolveConfig(api.pluginConfig ?? {});
     const lastUploadAt = new Map<string, number>();
 
     api.registerHook(
       ["message:sent"],
-      async (event: HookEvent) => {
-        if (event.type !== "message" || event.action !== "sent") {
-          return;
-        }
-
-        const session = event.context.sessionEntry as AgentSession | undefined;
-        if (!session) {
-          return;
-        }
+      async (...args: unknown[]) => {
+        const event = args[0] as HookEvent;
+        const sessionKey = event.sessionKey;
+        if (!sessionKey) return;
 
         const now = Date.now();
-        const last = lastUploadAt.get(event.sessionKey) ?? 0;
-        if (now - last < cfg.throttleMs) {
-          return;
-        }
+        const last = lastUploadAt.get(sessionKey) ?? 0;
+        if (now - last < cfg.throttleMs) return;
+
+        // Build a minimal session from the hook event context
+        // 从 hook 事件上下文构建最小 session
+        const session: AgentSession = {
+          id: sessionKey,
+          prompt: "",
+          actions: [],
+          report: "",
+          startedAt: new Date().toISOString(),
+          endedAt: new Date().toISOString(),
+          framework: "openclaw",
+          model: "",
+        };
 
         const uploadPromise = cfg.apiKey
-          ? uploadToRemote(session, event.sessionKey, cfg.apiKey, cfg.dashboardUrl)
+          ? uploadToRemote(session, sessionKey, cfg.apiKey, cfg.dashboardUrl)
           : Promise.resolve(false);
 
         const [result, uploaded] = await Promise.all([
@@ -162,14 +169,14 @@ export default {
         ]);
 
         if (uploaded) {
-          lastUploadAt.set(event.sessionKey, now);
+          lastUploadAt.set(sessionKey, now);
         }
 
         const warning = result.belowThreshold
-          ? `\n\n**Warning:** Alignment score ${result.score.score}/100 is below the threshold of ${result.threshold}.`
+          ? ` (below threshold ${result.threshold})`
           : "";
 
-        event.messages.push(result.report + warning);
+        console.log(`[agentscore] ${sessionKey}: score=${result.score.score}/100${warning}`);
       },
       { name: "agentscore-alignment" },
     );
