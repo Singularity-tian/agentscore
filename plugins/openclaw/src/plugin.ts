@@ -83,22 +83,42 @@ function extractActions(messages?: AgentEndEvent["messages"]): Array<{
 
   // Collect tool_use blocks from assistant messages
   // 从 assistant 消息中收集 tool_use blocks
-  const pendingTools = new Map<string, { tool: string; params: Record<string, unknown>; result?: unknown; timestamp: string }>();
+  const pendingTools = new Map<
+    string,
+    {
+      tool: string;
+      params: Record<string, unknown>;
+      result?: unknown;
+      timestamp: string;
+    }
+  >();
 
   for (const msg of messages) {
-    const timestamp = typeof (msg as any).timestamp === "number"
-      ? new Date((msg as any).timestamp).toISOString()
-      : new Date().toISOString();
+    const timestamp =
+      typeof (msg as any).timestamp === "number"
+        ? new Date((msg as any).timestamp).toISOString()
+        : new Date().toISOString();
 
     // Match toolCall blocks (OpenClaw uses "toolCall" not "tool_use")
     // 匹配 toolCall blocks（OpenClaw 使用 "toolCall" 而非 "tool_use"）
     if (msg.role === "assistant" && Array.isArray(msg.content)) {
       for (const block of msg.content) {
         const b = block as Record<string, unknown>;
-        if ((b.type === "toolCall" || b.type === "tool_use") && typeof b.name === "string") {
-          const entry: { tool: string; params: Record<string, unknown>; result?: unknown; timestamp: string } = {
+        if (
+          (b.type === "toolCall" || b.type === "tool_use") &&
+          typeof b.name === "string"
+        ) {
+          const entry: {
+            tool: string;
+            params: Record<string, unknown>;
+            result?: unknown;
+            timestamp: string;
+          } = {
             tool: b.name,
-            params: (b.input as Record<string, unknown>) ?? (b.params as Record<string, unknown>) ?? {},
+            params:
+              (b.input as Record<string, unknown>) ??
+              (b.params as Record<string, unknown>) ??
+              {},
             timestamp,
           };
           const id = (b.id ?? b.toolCallId) as string | undefined;
@@ -110,7 +130,10 @@ function extractActions(messages?: AgentEndEvent["messages"]): Array<{
 
     // Match toolResult messages (OpenClaw uses role="toolResult")
     // 匹配 toolResult 消息（OpenClaw 使用 role="toolResult"）
-    if ((msg.role === "toolResult" || msg.role === "tool") && Array.isArray(msg.content)) {
+    if (
+      (msg.role === "toolResult" || msg.role === "tool") &&
+      Array.isArray(msg.content)
+    ) {
       const resultId = (msg as any).toolCallId ?? (msg as any).tool_use_id;
       if (typeof resultId === "string") {
         const pending = pendingTools.get(resultId);
@@ -125,8 +148,8 @@ function extractActions(messages?: AgentEndEvent["messages"]): Array<{
   return actions;
 }
 
-/** Default request timeout in milliseconds. */
-const DEFAULT_TIMEOUT_MS = 20_000;
+/** Upload timeout – generous because the server does LLM scoring. */
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 export interface AgentScorePluginConfig {
   apiKey?: string;
@@ -136,16 +159,24 @@ export interface AgentScorePluginConfig {
   dashboardUrl?: string;
 }
 
-function resolveConfig(raw: Record<string, unknown>): Required<
-  Omit<AgentScorePluginConfig, "apiKey">
-> & { apiKey?: string } {
-  const threshold = typeof raw.threshold === "number" && raw.threshold >= 0 && raw.threshold <= 100
-    ? raw.threshold : 70;
-  const throttleMs = typeof raw.throttleMs === "number" && raw.throttleMs > 0
-    ? raw.throttleMs : 60_000;
+function resolveConfig(
+  raw: Record<string, unknown>,
+): Required<Omit<AgentScorePluginConfig, "apiKey">> & { apiKey?: string } {
+  const threshold =
+    typeof raw.threshold === "number" &&
+    raw.threshold >= 0 &&
+    raw.threshold <= 100
+      ? raw.threshold
+      : 70;
+  const throttleMs =
+    typeof raw.throttleMs === "number" && raw.throttleMs > 0
+      ? raw.throttleMs
+      : 60_000;
   const verbose = raw.verbose === true;
-  const dashboardUrl = (typeof raw.dashboardUrl === "string" && raw.dashboardUrl
-    ? raw.dashboardUrl : "https://getagentscore.com"
+  const dashboardUrl = (
+    typeof raw.dashboardUrl === "string" && raw.dashboardUrl
+      ? raw.dashboardUrl
+      : "https://getagentscore.com"
   ).replace(/\/+$/, "");
   const apiKey = typeof raw.apiKey === "string" ? raw.apiKey : undefined;
 
@@ -182,7 +213,7 @@ export async function uploadToRemote(
   };
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
   try {
     const response = await globalThis.fetch(url, {
@@ -239,67 +270,86 @@ export async function computeAlignmentFromSession(
 export default {
   id: "agentscore-openclaw",
   name: "AgentScore",
-  description: "Alignment verification — scores agent alignment and uploads to dashboard",
+  description:
+    "Alignment verification — scores agent alignment and uploads to dashboard",
   register(api: OpenClawPluginApi) {
     const cfg = resolveConfig(api.pluginConfig ?? {});
     const lastUploadAt = new Map<string, number>();
 
     // Use api.on() for typed plugin hooks (works for both webchat and channels)
     // 使用 api.on() 注册 typed plugin hook（webchat 和 channel 都会触发）
-    (api as any).on("agent_end", async (event: AgentEndEvent, ctx: AgentEndContext) => {
-      const sessionKey = ctx.sessionKey ?? "unknown";
-      const prompt = extractPrompt(event.messages);
-      console.log(`[agentscore] agent_end fired, sessionKey=${sessionKey}, success=${event.success}`);
-      // Debug: dump message roles and content block types
-      // 调试：输出消息角色和 content block 类型
-      for (const msg of event.messages ?? []) {
-        const types = Array.isArray(msg.content)
-          ? (msg.content as Array<Record<string, unknown>>).map(b => b.type).join(",")
-          : typeof msg.content;
-        console.log(`[agentscore] msg role=${msg.role} contentTypes=${types}`);
-      }
+    (api as any).on(
+      "agent_end",
+      async (event: AgentEndEvent, ctx: AgentEndContext) => {
+        const sessionKey = ctx.sessionKey ?? "unknown";
+        const prompt = extractPrompt(event.messages);
+        console.log(
+          `[agentscore] agent_end fired, sessionKey=${sessionKey}, success=${event.success}`,
+        );
+        // Debug: dump message roles and content block types
+        // 调试：输出消息角色和 content block 类型
+        for (const msg of event.messages ?? []) {
+          const types = Array.isArray(msg.content)
+            ? (msg.content as Array<Record<string, unknown>>)
+                .map((b) => b.type)
+                .join(",")
+            : typeof msg.content;
+          console.log(
+            `[agentscore] msg role=${msg.role} contentTypes=${types}`,
+          );
+        }
 
-      if (!event.success) return;
+        if (!event.success) return;
 
-      const now = Date.now();
-      const last = lastUploadAt.get(sessionKey) ?? 0;
-      if (now - last < cfg.throttleMs) return;
+        const now = Date.now();
+        const last = lastUploadAt.get(sessionKey) ?? 0;
+        if (now - last < cfg.throttleMs) return;
 
-      // Build session from event + context
-      // 从 event 和 context 构建 session
-      const actions = extractActions(event.messages);
-      const report = extractReport(event.messages);
-      console.log(`[agentscore] extracted ${actions.length} actions, report length=${report.length}`);
+        // Build session from event + context
+        // 从 event 和 context 构建 session
+        const actions = extractActions(event.messages);
+        const report = extractReport(event.messages);
+        console.log(
+          `[agentscore] extracted ${actions.length} actions, report length=${report.length}`,
+        );
 
-      const session: AgentSession = {
-        id: ctx.sessionId ?? sessionKey,
-        prompt,
-        actions,
-        report,
-        startedAt: new Date(now - (event.durationMs ?? 0)).toISOString(),
-        endedAt: new Date(now).toISOString(),
-        framework: "openclaw",
-        model: "",
-      };
+        const session: AgentSession = {
+          id: ctx.sessionId ?? sessionKey,
+          prompt,
+          actions,
+          report,
+          startedAt: new Date(now - (event.durationMs ?? 0)).toISOString(),
+          endedAt: new Date(now).toISOString(),
+          framework: "openclaw",
+          model: "",
+        };
 
-      const uploadPromise = cfg.apiKey
-        ? uploadToRemote(session, sessionKey, cfg.apiKey, cfg.dashboardUrl)
-        : Promise.resolve(false);
-
-      const [result, uploaded] = await Promise.all([
-        computeAlignmentFromSession(session, cfg),
-        uploadPromise,
-      ]);
-
-      if (uploaded) {
+        // Record the intent-to-upload timestamp now so that a newer agent_end
+        // won't be throttled while a slow upload from this invocation is in flight.
         lastUploadAt.set(sessionKey, now);
-      }
 
-      const warning = result.belowThreshold
-        ? ` (below threshold ${result.threshold})`
-        : "";
+        // Fire-and-forget: upload runs in background so it never blocks scoring.
+        if (cfg.apiKey) {
+          uploadToRemote(
+            session,
+            sessionKey,
+            cfg.apiKey,
+            cfg.dashboardUrl,
+          ).catch(() => {
+            /* already logged inside uploadToRemote */
+          });
+        }
 
-      console.log(`[agentscore] ${sessionKey}: score=${result.score.score}/100${warning}`);
-    });
+        const result = await computeAlignmentFromSession(session, cfg);
+
+        const warning = result.belowThreshold
+          ? ` (below threshold ${result.threshold})`
+          : "";
+
+        console.log(
+          `[agentscore] ${sessionKey}: score=${result.score.score}/100${warning}`,
+        );
+      },
+    );
   },
 };
