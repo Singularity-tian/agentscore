@@ -1,11 +1,19 @@
-import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import type { HookEvent } from "openclaw/plugin-sdk/plugin-entry";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import {
   computeAlignment,
   type AgentSession,
   type ScoringInput,
 } from "@llmagentscore/core";
 import { formatReport } from "./report.js";
+
+interface HookEvent {
+  type: string;
+  action: string;
+  sessionKey: string;
+  timestamp: Date;
+  messages: string[];
+  context: Record<string, unknown>;
+}
 
 /** Default request timeout in milliseconds. */
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -118,17 +126,17 @@ export async function computeAlignmentFromSession(
   };
 }
 
-export default definePluginEntry({
+export default {
   id: "agentscore",
   name: "AgentScore",
   description: "Alignment verification — scores agent alignment and uploads to dashboard",
-  register(api) {
+  register(api: OpenClawPluginApi) {
     const cfg = resolveConfig(api.pluginConfig ?? {});
     const lastUploadAt = new Map<string, number>();
 
-    api.registerHook({
-      events: ["message:sent"],
-      async handler(event: HookEvent) {
+    api.registerHook(
+      ["message:sent"],
+      async (event: HookEvent) => {
         if (event.type !== "message" || event.action !== "sent") {
           return;
         }
@@ -163,6 +171,6 @@ export default definePluginEntry({
 
         event.messages.push(result.report + warning);
       },
-    });
+    );
   },
-});
+};
