@@ -4,7 +4,7 @@
  * The full SDK is provided by the OpenClaw host at runtime.
  * These declarations let us compile without installing openclaw as a dependency.
  */
-declare module "openclaw/plugin-sdk/plugin-entry" {
+declare module "openclaw/plugin-sdk" {
   export interface HookEvent {
     type: string;
     action: string;
@@ -17,20 +17,12 @@ declare module "openclaw/plugin-sdk/plugin-entry" {
   export interface OpenClawPluginApi {
     pluginConfig: Record<string, unknown>;
     config: Record<string, unknown>;
-    registerHook(hook: {
-      events: string[];
-      handler(event: HookEvent): void | Promise<void>;
-    }): void;
+    registerHook(
+      events: string | string[],
+      handler: (...args: unknown[]) => void | Promise<void>,
+      opts?: Record<string, unknown>,
+    ): void;
   }
 
-  export interface OpenClawPluginDefinition {
-    id: string;
-    name?: string;
-    description?: string;
-    register(api: OpenClawPluginApi): void;
-  }
-
-  export function definePluginEntry(
-    definition: OpenClawPluginDefinition,
-  ): OpenClawPluginDefinition;
+  export function emptyPluginConfigSchema(): Record<string, unknown>;
 }
