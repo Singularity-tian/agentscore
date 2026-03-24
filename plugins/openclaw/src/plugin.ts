@@ -6,13 +6,16 @@ import {
 } from "@llmagentscore/core";
 import { formatReport } from "./report.js";
 
-// Internal hook event shape for message:sent
-// message:sent 内部 hook 事件结构
-interface HookEvent {
-  type: string;
-  action: string;
-  sessionKey: string;
-  context: Record<string, unknown>;
+// Typed plugin hook event shape for agent_end
+// agent_end typed plugin hook 事件结构
+interface AgentEndEvent {
+  sessionKey?: string;
+  agentId?: string;
+  model?: string;
+  durationMs?: number;
+  success?: boolean;
+  error?: string;
+  [key: string]: unknown;
 }
 
 /** Default request timeout in milliseconds. */
@@ -131,54 +134,50 @@ export default {
   name: "AgentScore",
   description: "Alignment verification — scores agent alignment and uploads to dashboard",
   register(api: OpenClawPluginApi) {
-    console.log("[agentscore] register() called, pluginConfig:", JSON.stringify(api.pluginConfig ?? {}));
     const cfg = resolveConfig(api.pluginConfig ?? {});
     const lastUploadAt = new Map<string, number>();
 
-    api.registerHook(
-      ["message:sent"],
-      async (...args: unknown[]) => {
-        const event = args[0] as HookEvent;
-        const sessionKey = event.sessionKey;
-        if (!sessionKey) return;
+    // Use api.on() for typed plugin hooks (works for both webchat and channels)
+    // 使用 api.on() 注册 typed plugin hook（webchat 和 channel 都会触发）
+    (api as any).on("agent_end", async (event: AgentEndEvent) => {
+      const sessionKey = event.sessionKey ?? "unknown";
+      console.log(`[agentscore] agent_end fired, sessionKey=${sessionKey}`);
 
-        const now = Date.now();
-        const last = lastUploadAt.get(sessionKey) ?? 0;
-        if (now - last < cfg.throttleMs) return;
+      const now = Date.now();
+      const last = lastUploadAt.get(sessionKey) ?? 0;
+      if (now - last < cfg.throttleMs) return;
 
-        // Build a minimal session from the hook event context
-        // 从 hook 事件上下文构建最小 session
-        const session: AgentSession = {
-          id: sessionKey,
-          prompt: "",
-          actions: [],
-          report: "",
-          startedAt: new Date().toISOString(),
-          endedAt: new Date().toISOString(),
-          framework: "openclaw",
-          model: "",
-        };
+      // Build a minimal session from the agent_end event
+      // 从 agent_end 事件构建最小 session
+      const session: AgentSession = {
+        id: sessionKey,
+        prompt: "",
+        actions: [],
+        report: "",
+        startedAt: new Date(now - (event.durationMs ?? 0)).toISOString(),
+        endedAt: new Date(now).toISOString(),
+        framework: "openclaw",
+        model: event.model ?? "",
+      };
 
-        const uploadPromise = cfg.apiKey
-          ? uploadToRemote(session, sessionKey, cfg.apiKey, cfg.dashboardUrl)
-          : Promise.resolve(false);
+      const uploadPromise = cfg.apiKey
+        ? uploadToRemote(session, sessionKey, cfg.apiKey, cfg.dashboardUrl)
+        : Promise.resolve(false);
 
-        const [result, uploaded] = await Promise.all([
-          computeAlignmentFromSession(session, cfg),
-          uploadPromise,
-        ]);
+      const [result, uploaded] = await Promise.all([
+        computeAlignmentFromSession(session, cfg),
+        uploadPromise,
+      ]);
 
-        if (uploaded) {
-          lastUploadAt.set(sessionKey, now);
-        }
+      if (uploaded) {
+        lastUploadAt.set(sessionKey, now);
+      }
 
-        const warning = result.belowThreshold
-          ? ` (below threshold ${result.threshold})`
-          : "";
+      const warning = result.belowThreshold
+        ? ` (below threshold ${result.threshold})`
+        : "";
 
-        console.log(`[agentscore] ${sessionKey}: score=${result.score.score}/100${warning}`);
-      },
-      { name: "agentscore-alignment" },
-    );
+      console.log(`[agentscore] ${sessionKey}: score=${result.score.score}/100${warning}`);
+    });
   },
 };
