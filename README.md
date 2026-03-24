@@ -18,8 +18,8 @@ AgentScore compares **what the user asked** (prompt) → **what the agent did** 
 |---------|-------------|
 | [`@llmagentscore/core`](packages/core) | Scoring engine — pure functions, zero runtime deps |
 | [`agentscore`](packages/cli) | CLI for scoring sessions from the terminal |
-| [`@agentscore/sdk`](packages/sdk) | SDK for integrating scoring into custom agents |
-| [`@agentscore/openclaw-skill`](skills/openclaw) | OpenClaw framework skill |
+| [`@llmagentscore/sdk`](packages/sdk) | SDK for integrating scoring into custom agents |
+| [`@llmagentscore/openclaw-hook`](skills/openclaw) | OpenClaw framework hook |
 
 ## Quick Start
 
@@ -51,11 +51,11 @@ agentscore watch -- node my-agent.js
 ### SDK
 
 ```bash
-npm install @agentscore/sdk
+npm install @llmagentscore/sdk
 ```
 
 ```typescript
-import { AgentScoreSession, AgentScoreReporter } from '@agentscore/sdk';
+import { AgentScoreSession, AgentScoreReporter } from '@llmagentscore/sdk';
 
 // Start tracking
 const session = AgentScoreSession.startSession({
@@ -86,7 +86,7 @@ await reporter.report(result);
 Automatically capture LLM tool calls without manual instrumentation:
 
 ```typescript
-import { AgentScoreSession, installInterceptor } from '@agentscore/sdk';
+import { AgentScoreSession, installInterceptor } from '@llmagentscore/sdk';
 
 const session = AgentScoreSession.startSession({ prompt: '...' });
 const handle = installInterceptor((action) => session.recordAction(action));
@@ -101,7 +101,7 @@ const result = session.end('Done.');
 ### Express Middleware
 
 ```typescript
-import { agentScoreMiddleware } from '@agentscore/sdk';
+import { agentScoreMiddleware } from '@llmagentscore/sdk';
 
 app.use(agentScoreMiddleware({
   extractPrompt: (req) => req.body?.prompt,
@@ -113,11 +113,13 @@ app.use(agentScoreMiddleware({
 ## Scoring
 
 **Alignment Score (0–100):**
+
 - Base = (matched instructions / total instructions) × 100
 - −5 per unexpected action
 - −15 per constraint violation
 
 **Truthfulness Score (0–100):**
+
 - Each claim in the agent's report is matched against actual tool calls
 - Score = (verified claims / total claims) × 100
 
@@ -183,7 +185,7 @@ agentscore/
 │   ├── cli/            # Terminal commands (check, diff, drift, sync, watch)
 │   └── sdk/            # Session tracking, fetch interceptor, reporter, middleware
 └── skills/
-    └── openclaw/       # OpenClaw framework integration
+    └── openclaw/       # OpenClaw framework hook
 ```
 
 ## License

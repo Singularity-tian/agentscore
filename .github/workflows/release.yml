@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: read
@@ -41,12 +41,12 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @agentscore/sdk
+      - name: Publish @llmagentscore/sdk
         run: npm publish --workspace packages/sdk --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @agentscore/openclaw-skill
+      - name: Publish @llmagentscore/openclaw-hook
         run: npm publish --workspace skills/openclaw --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

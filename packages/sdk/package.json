@@ -1,5 +1,5 @@
 {
-  "name": "@agentscore/sdk",
+  "name": "@llmagentscore/sdk",
   "version": "0.1.0",
   "description": "SDK for integrating AgentScore into custom AI agents",
   "type": "module",
@@ -11,7 +11,9 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",

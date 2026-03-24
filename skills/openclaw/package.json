@@ -1,11 +1,19 @@
 {
-  "name": "@agentscore/openclaw-skill",
+  "name": "@llmagentscore/openclaw-hook",
   "version": "0.1.0",
-  "description": "AgentScore skill for OpenClaw",
+  "description": "AgentScore hook for OpenClaw — alignment verification on message:sent",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "SKILL.md"],
+  "files": [
+    "dist",
+    "HOOK.md"
+  ],
+  "openclaw": {
+    "hooks": [
+      "./"
+    ]
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
