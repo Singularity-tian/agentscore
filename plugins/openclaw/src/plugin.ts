@@ -142,7 +142,7 @@ function resolveConfig(raw: Record<string, unknown>): Required<
   const threshold = typeof raw.threshold === "number" && raw.threshold >= 0 && raw.threshold <= 100
     ? raw.threshold : 70;
   const throttleMs = typeof raw.throttleMs === "number" && raw.throttleMs > 0
-    ? raw.throttleMs : 180_000;
+    ? raw.throttleMs : 60_000;
   const verbose = raw.verbose === true;
   const dashboardUrl = (typeof raw.dashboardUrl === "string" && raw.dashboardUrl
     ? raw.dashboardUrl : "https://getagentscore.com"

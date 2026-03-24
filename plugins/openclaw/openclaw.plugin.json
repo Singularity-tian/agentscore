@@ -20,7 +20,7 @@
       "throttleMs": {
         "type": "number",
         "minimum": 0,
-        "default": 180000,
+        "default": 60000,
         "description": "Minimum interval (ms) between scoring per session."
       },
       "verbose": {
