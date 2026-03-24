@@ -237,7 +237,7 @@ export async function computeAlignmentFromSession(
 }
 
 export default {
-  id: "agentscore",
+  id: "agentscore-openclaw",
   name: "AgentScore",
   description: "Alignment verification — scores agent alignment and uploads to dashboard",
   register(api: OpenClawPluginApi) {

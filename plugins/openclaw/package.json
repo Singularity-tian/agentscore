@@ -1,5 +1,5 @@
 {
-  "name": "@llmagentscore/openclaw-plugin",
+  "name": "@llmagentscore/agentscore-openclaw",
   "version": "0.1.0",
   "description": "AgentScore plugin for OpenClaw — alignment verification on message:sent",
   "type": "module",

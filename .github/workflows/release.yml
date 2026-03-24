@@ -46,7 +46,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @llmagentscore/openclaw-plugin
+      - name: Publish @llmagentscore/agentscore-openclaw
         run: npm publish --workspace plugins/openclaw --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

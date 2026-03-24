@@ -30,26 +30,26 @@ This plugin listens on the `message:sent` event. When triggered it:
 
 ## Configuration
 
-AgentScore is an OpenClaw plugin. All settings live under `plugins.entries.agentscore.config`
+AgentScore is an OpenClaw plugin. All settings live under `plugins.entries.agentscore-openclaw.config`
 and can be managed with `openclaw config get/set`:
 
 ### CLI
 
 ```bash
 # Set the API key
-openclaw config set plugins.entries.agentscore.config.apiKey "sk-xxx"
+openclaw config set plugins.entries.agentscore-openclaw.config.apiKey "sk-xxx"
 
 # Read it back
-openclaw config get plugins.entries.agentscore.config.apiKey
+openclaw config get plugins.entries.agentscore-openclaw.config.apiKey
 
 # Remove it (disables remote upload)
-openclaw config unset plugins.entries.agentscore.config.apiKey
+openclaw config unset plugins.entries.agentscore-openclaw.config.apiKey
 
 # Other settings
-openclaw config set plugins.entries.agentscore.config.threshold 80
-openclaw config set plugins.entries.agentscore.config.throttleMs 120000
-openclaw config set plugins.entries.agentscore.config.verbose true
-openclaw config set plugins.entries.agentscore.config.dashboardUrl "https://getagentscore.com"
+openclaw config set plugins.entries.agentscore-openclaw.config.threshold 80
+openclaw config set plugins.entries.agentscore-openclaw.config.throttleMs 120000
+openclaw config set plugins.entries.agentscore-openclaw.config.verbose true
+openclaw config set plugins.entries.agentscore-openclaw.config.dashboardUrl "https://getagentscore.com"
 ```
 
 ### JSON config (manual)
@@ -60,7 +60,7 @@ Edit `~/.openclaw/openclaw.json` directly:
 {
   plugins: {
     entries: {
-      agentscore: {
+      "agentscore-openclaw": {
         config: {
           apiKey: "sk-xxx",
           threshold: 80,
@@ -86,12 +86,12 @@ Edit `~/.openclaw/openclaw.json` directly:
 
 ## Programmatic access
 
-The plugin exports its scoring and upload APIs via `@llmagentscore/openclaw-plugin`:
+The plugin exports its scoring and upload APIs via `@llmagentscore/agentscore-openclaw`:
 
 ```typescript
 import {
   computeAlignmentFromSession,
   uploadToRemote,
   formatReport,
-} from '@llmagentscore/openclaw-plugin';
+} from '@llmagentscore/agentscore-openclaw';
 ```

@@ -1,5 +1,5 @@
 {
-  "id": "agentscore",
+  "id": "agentscore-openclaw",
   "name": "AgentScore",
   "description": "Alignment verification — scores how faithfully the agent followed instructions and uploads results to AgentScore dashboard",
   "configSchema": {

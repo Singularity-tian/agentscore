@@ -19,7 +19,7 @@ AgentScore compares **what the user asked** (prompt) → **what the agent did** 
 | [`@llmagentscore/core`](packages/core) | Scoring engine — pure functions, zero runtime deps |
 | [`agentscore`](packages/cli) | CLI for scoring sessions from the terminal |
 | [`@llmagentscore/sdk`](packages/sdk) | SDK for integrating scoring into custom agents |
-| [`@llmagentscore/openclaw-plugin`](plugins/openclaw) | OpenClaw plugin |
+| [`@llmagentscore/agentscore-openclaw`](plugins/openclaw) | OpenClaw plugin |
 
 ## Quick Start
 
@@ -97,6 +97,20 @@ await fetch('https://api.openai.com/v1/chat/completions', { ... });
 handle.restore();
 const result = session.end('Done.');
 ```
+
+### OpenClaw Plugin
+
+```bash
+openclaw plugin install @llmagentscore/agentscore-openclaw
+```
+
+Once installed, configure your API key to enable dashboard uploads:
+
+```bash
+openclaw config set plugins.entries.agentscore-openclaw.config.apiKey "sk-xxx"
+```
+
+The plugin automatically scores every agent session on completion. See the [plugin README](plugins/openclaw) for all configuration options.
 
 ### Express Middleware
 
