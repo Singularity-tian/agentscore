@@ -6,10 +6,20 @@ import {
 } from "@llmagentscore/core";
 import { formatReport } from "./report.js";
 
+// Message shape from agent_end hook
+// agent_end hook 传入的消息结构
+interface AgentMessage {
+  role: string;
+  content: unknown;
+  timestamp?: number;
+  toolCallId?: string;
+  tool_use_id?: string;
+}
+
 // agent_end hook event (first argument)
 // agent_end hook 事件（第一个参数）
 interface AgentEndEvent {
-  messages?: Array<{ role: string; content: unknown }>;
+  messages?: AgentMessage[];
   success?: boolean;
   error?: string;
   durationMs?: number;
@@ -27,6 +37,24 @@ interface AgentEndContext {
   channelId?: string;
 }
 
+// A single task extracted from a message group
+// 从消息分组中提取的单个任务
+interface TaskSlice {
+  prompt: string;
+  actions: Array<{
+    tool: string;
+    params: Record<string, unknown>;
+    result?: unknown;
+    timestamp: string;
+  }>;
+  report: string;
+  startedAt: string;
+  endedAt: string;
+}
+
+// ── Helper functions ──────────────────────────────────────
+// ── 辅助函数 ──────────────────────────────────────────────
+
 // Extract text from a content block or string
 // 从 content block 或字符串中提取文本
 function extractText(content: unknown): string | null {
@@ -41,62 +69,21 @@ function extractText(content: unknown): string | null {
   return null;
 }
 
-// Extract first user prompt text from messages array
-// 从 messages 数组中提取第一条用户 prompt
-function extractPrompt(messages?: AgentEndEvent["messages"]): string {
-  if (!messages?.length) return "(no prompt)";
-  for (const msg of messages) {
-    if (msg.role !== "user") continue;
-    const text = extractText(msg.content);
-    if (text) return text;
-  }
-  return "(no prompt)";
-}
-
-// Extract assistant's last text reply as report
-// 提取 assistant 最后一条文本回复作为 report
-function extractReport(messages?: AgentEndEvent["messages"]): string {
-  if (!messages?.length) return "";
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role !== "assistant") continue;
-    const text = extractText(messages[i].content);
-    if (text) return text;
-  }
-  return "";
-}
-
-// Extract tool calls from messages as AgentAction[]
-// 从 messages 中提取 tool 调用作为 AgentAction[]
-function extractActions(messages?: AgentEndEvent["messages"]): Array<{
-  tool: string;
-  params: Record<string, unknown>;
-  result?: unknown;
-  timestamp: string;
-}> {
+// Extract tool calls from a message group as AgentAction[]
+// 从消息分组中提取 tool 调用作为 AgentAction[]
+function extractActions(messages?: AgentMessage[]): TaskSlice["actions"] {
   if (!messages?.length) return [];
-  const actions: Array<{
-    tool: string;
-    params: Record<string, unknown>;
-    result?: unknown;
-    timestamp: string;
-  }> = [];
+  const actions: TaskSlice["actions"] = [];
 
-  // Collect tool_use blocks from assistant messages
-  // 从 assistant 消息中收集 tool_use blocks
   const pendingTools = new Map<
     string,
-    {
-      tool: string;
-      params: Record<string, unknown>;
-      result?: unknown;
-      timestamp: string;
-    }
+    { tool: string; params: Record<string, unknown>; result?: unknown; timestamp: string }
   >();
 
   for (const msg of messages) {
     const timestamp =
-      typeof (msg as any).timestamp === "number"
-        ? new Date((msg as any).timestamp).toISOString()
+      typeof msg.timestamp === "number"
+        ? new Date(msg.timestamp).toISOString()
         : new Date().toISOString();
 
     // Match toolCall blocks (OpenClaw uses "toolCall" not "tool_use")
@@ -108,12 +95,7 @@ function extractActions(messages?: AgentEndEvent["messages"]): Array<{
           (b.type === "toolCall" || b.type === "tool_use") &&
           typeof b.name === "string"
         ) {
-          const entry: {
-            tool: string;
-            params: Record<string, unknown>;
-            result?: unknown;
-            timestamp: string;
-          } = {
+          const entry: TaskSlice["actions"][number] = {
             tool: b.name,
             params:
               (b.arguments as Record<string, unknown>) ??
@@ -135,7 +117,7 @@ function extractActions(messages?: AgentEndEvent["messages"]): Array<{
       (msg.role === "toolResult" || msg.role === "tool") &&
       Array.isArray(msg.content)
     ) {
-      const resultId = (msg as any).toolCallId ?? (msg as any).tool_use_id;
+      const resultId = msg.toolCallId ?? msg.tool_use_id;
       if (typeof resultId === "string") {
         const pending = pendingTools.get(resultId);
         if (pending) {
@@ -149,8 +131,89 @@ function extractActions(messages?: AgentEndEvent["messages"]): Array<{
   return actions;
 }
 
+// Split messages into task groups, each starting with a user message
+// 将消息按用户消息切分为任务分组，每条 user 消息开始一个新分组
+function splitMessagesIntoTasks(messages: AgentMessage[]): AgentMessage[][] {
+  if (!messages.length) return [];
+  const groups: AgentMessage[][] = [];
+  let current: AgentMessage[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === "user" && current.length > 0) {
+      // User message starts a new group; push the previous one
+      // 用户消息开始新分组；保存上一个分组
+      groups.push(current);
+      current = [];
+    }
+    current.push(msg);
+  }
+
+  // Push the last group
+  // 保存最后一个分组
+  if (current.length > 0) {
+    groups.push(current);
+  }
+
+  return groups;
+}
+
+// Build a TaskSlice from a message group
+// 从消息分组构建 TaskSlice
+function buildTaskSlice(
+  group: AgentMessage[],
+  fallbackStartMs: number,
+  groupIndex: number,
+): TaskSlice | null {
+  // Collect user message texts as prompt, skipping bootstrap/system-injected messages
+  // 收集用户消息文本作为 prompt，跳过 bootstrap/系统注入的消息
+  const BOOTSTRAP_PREFIX = "A new session was started via";
+  const promptParts: string[] = [];
+  for (const msg of group) {
+    if (msg.role === "user") {
+      const text = extractText(msg.content);
+      if (!text) continue;
+      // Skip OpenClaw bootstrap messages (session startup instructions)
+      // 跳过 OpenClaw bootstrap 消息（会话启动指令）
+      if (text.startsWith(BOOTSTRAP_PREFIX)) continue;
+      promptParts.push(text);
+    }
+  }
+  const prompt = promptParts.join("\n\n");
+  if (!prompt) return null; // API requires prompt.min(1), also filters pure bootstrap groups
+
+  // Collect all assistant text as report
+  // 收集所有 assistant 文本作为 report
+  const reportParts: string[] = [];
+  for (const msg of group) {
+    if (msg.role === "assistant") {
+      const text = extractText(msg.content);
+      if (text) reportParts.push(text);
+    }
+  }
+  const report = reportParts.join("\n\n");
+
+  // Extract actions from this group
+  // 从该分组提取 actions
+  const actions = extractActions(group);
+
+  // Resolve timestamps: prefer message timestamps, fallback with 1ms offset for dedup
+  // 解析时间戳：优先用消息时间戳，缺失时用 1ms 偏移保证去重唯一性
+  const firstTs = group.find((m) => typeof m.timestamp === "number")?.timestamp;
+  const lastTs = [...group].reverse().find((m) => typeof m.timestamp === "number")?.timestamp;
+  const startedAt = new Date(firstTs ?? fallbackStartMs + groupIndex).toISOString();
+  const endedAt = new Date(lastTs ?? fallbackStartMs + groupIndex + 1).toISOString();
+
+  return { prompt, actions, report, startedAt, endedAt };
+}
+
+// ── Upload functions ──────────────────────────────────────
+// ── 上传函数 ──────────────────────────────────────────────
+
 /** Upload timeout – generous because the server does LLM scoring. */
 const UPLOAD_TIMEOUT_MS = 120_000;
+
+/** Max tasks per batch (dashboard limit) */
+const BATCH_SIZE = 50;
 
 export interface AgentScorePluginConfig {
   apiKey?: string;
@@ -189,9 +252,8 @@ function parseAgentId(sessionKey: string): string {
   return parts.length >= 2 ? parts[1] : sessionKey;
 }
 
-/**
- * Upload session data to the AgentScore dashboard for server-side scoring.
- */
+// Upload a single session to the dashboard (kept for backward compatibility)
+// 上传单个 session 到 dashboard（保留用于向后兼容）
 export async function uploadToRemote(
   session: AgentSession,
   sessionKey: string,
@@ -244,9 +306,71 @@ export async function uploadToRemote(
   }
 }
 
-/**
- * Compute alignment for a completed session.
- */
+// Upload multiple tasks as a batch to the dashboard
+// 批量上传多个 tasks 到 dashboard
+async function uploadBatchToRemote(
+  taskSlices: TaskSlice[],
+  sessionKey: string,
+  apiKey: string,
+  dashboardUrl: string,
+): Promise<boolean> {
+  const agentName = parseAgentId(sessionKey);
+  const url = `${dashboardUrl}/api/v1/score`;
+  let allOk = true;
+
+  // Chunk into batches of BATCH_SIZE
+  // 按 BATCH_SIZE 分批
+  for (let i = 0; i < taskSlices.length; i += BATCH_SIZE) {
+    const batch = taskSlices.slice(i, i + BATCH_SIZE);
+    const payload = {
+      agentName,
+      framework: "openclaw" as const,
+      source: "sdk" as const,
+      tasks: batch.map((t) => ({
+        prompt: t.prompt,
+        actions: t.actions,
+        report: t.report,
+        startedAt: t.startedAt,
+        endedAt: t.endedAt,
+        model: "",
+      })),
+    };
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+    try {
+      const response = await globalThis.fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.error(
+          `[agentscore] batch upload failed: HTTP ${response.status}: ${text}`,
+        );
+        allOk = false;
+      }
+    } catch (err) {
+      console.error(`[agentscore] batch upload failed:`, (err as Error).message);
+      allOk = false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return allOk;
+}
+
+// ── Scoring ───────────────────────────────────────────────
+// ── 评分 ──────────────────────────────────────────────────
+
 export async function computeAlignmentFromSession(
   session: AgentSession,
   opts: { threshold: number; verbose: boolean },
@@ -268,6 +392,9 @@ export async function computeAlignmentFromSession(
   };
 }
 
+// ── Plugin entry ──────────────────────────────────────────
+// ── 插件入口 ──────────────────────────────────────────────
+
 export default {
   id: "agentscore-openclaw",
   name: "AgentScore",
@@ -276,6 +403,9 @@ export default {
   register(api: OpenClawPluginApi) {
     const cfg = resolveConfig(api.pluginConfig ?? {});
     const lastUploadAt = new Map<string, number>();
+    // Track the last uploaded task count per session to only upload new tasks
+    // 跟踪每个 session 上次上传的 task 数量，只上传新增的 tasks
+    const lastUploadedTaskCount = new Map<string, number>();
 
     // Use api.on() for typed plugin hooks (works for both webchat and channels)
     // 使用 api.on() 注册 typed plugin hook（webchat 和 channel 都会触发）
@@ -283,63 +413,80 @@ export default {
       "agent_end",
       async (event: AgentEndEvent, ctx: AgentEndContext) => {
         const sessionKey = ctx.sessionKey ?? "unknown";
-        const prompt = extractPrompt(event.messages);
         console.log(
           `[agentscore] agent_end fired, sessionKey=${sessionKey}, success=${event.success}`,
         );
-        // Debug: dump message roles and content block types
-        // 调试：输出消息角色和 content block 类型
-        for (const msg of event.messages ?? []) {
-          const types = Array.isArray(msg.content)
-            ? (msg.content as Array<Record<string, unknown>>)
-                .map((b) => b.type)
-                .join(",")
-            : typeof msg.content;
-          console.log(
-            `[agentscore] msg role=${msg.role} contentTypes=${types}`,
-          );
-        }
 
         if (!event.success) return;
+
+        // Skip internal temporary agents (e.g. slug-generator)
+        // 跳过内部临时 agent（如 slug-generator）
+        if (sessionKey.startsWith("temp:")) return;
 
         const now = Date.now();
         const last = lastUploadAt.get(sessionKey) ?? 0;
         if (now - last < cfg.throttleMs) return;
 
-        // Build session from event + context
-        // 从 event 和 context 构建 session
-        const actions = extractActions(event.messages);
-        const report = extractReport(event.messages);
+        // Split messages into per-user-turn task groups
+        // 将消息按用户交互轮次切分为任务分组
+        const groups = splitMessagesIntoTasks(event.messages ?? []);
+        const sessionStartMs = now - (event.durationMs ?? 0);
+
+        const allTaskSlices = groups
+          .map((group, idx) => buildTaskSlice(group, sessionStartMs, idx))
+          .filter((s): s is TaskSlice => s !== null);
+
+        if (allTaskSlices.length === 0) {
+          console.log(`[agentscore] no valid tasks found, skipping`);
+          return;
+        }
+
+        // Only upload tasks that haven't been uploaded yet
+        // 只上传尚未上传的新 tasks
+        const previousCount = lastUploadedTaskCount.get(sessionKey) ?? 0;
+        const taskSlices = allTaskSlices.slice(previousCount);
+
+        if (taskSlices.length === 0) {
+          console.log(`[agentscore] no new tasks since last upload, skipping`);
+          return;
+        }
+
         console.log(
-          `[agentscore] extracted ${actions.length} actions, report length=${report.length}`,
+          `[agentscore] split into ${allTaskSlices.length} tasks, ${taskSlices.length} new (${previousCount} already uploaded)`,
         );
 
-        const session: AgentSession = {
-          id: ctx.sessionId ?? sessionKey,
-          prompt,
-          actions,
-          report,
-          startedAt: new Date(now - (event.durationMs ?? 0)).toISOString(),
-          endedAt: new Date(now).toISOString(),
-          framework: "openclaw",
-          model: "",
-        };
 
-        // Record the intent-to-upload timestamp now so that a newer agent_end
-        // won't be throttled while a slow upload from this invocation is in flight.
+        // Record throttle timestamp and task count before async upload
+        // 在异步上传前记录节流时间戳和 task 数量
         lastUploadAt.set(sessionKey, now);
+        lastUploadedTaskCount.set(sessionKey, allTaskSlices.length);
 
-        // Fire-and-forget: upload runs in background so it never blocks scoring.
+        // Fire-and-forget batch upload
+        // 后台批量上传
         if (cfg.apiKey) {
-          uploadToRemote(
-            session,
+          uploadBatchToRemote(
+            taskSlices,
             sessionKey,
             cfg.apiKey,
             cfg.dashboardUrl,
           ).catch(() => {
-            /* already logged inside uploadToRemote */
+            /* already logged inside uploadBatchToRemote */
           });
         }
+
+        // Local scoring on the last task (most recent interaction)
+        // 对最后一个 task 做本地评分（最新交互）
+        const lastSlice = taskSlices[taskSlices.length - 1];
+        const session: AgentSession = {
+          id: ctx.sessionId ?? sessionKey,
+          prompt: lastSlice.prompt,
+          actions: lastSlice.actions,
+          report: lastSlice.report,
+          startedAt: lastSlice.startedAt,
+          endedAt: lastSlice.endedAt,
+          framework: "openclaw",
+          model: "",
+        };
 
         const result = await computeAlignmentFromSession(session, cfg);
 
