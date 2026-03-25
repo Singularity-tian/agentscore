@@ -145,3 +145,35 @@ export function matchScore(
 
   return Math.min(combined, 1);
 }
+
+/**
+ * Match an instruction against the agent's text report (no tool-verb matching).
+ * Uses entity overlap + TF-IDF cosine similarity only.
+ *
+ * 将指令与 agent 的文本回复进行匹配（不使用 tool-verb 匹配）。
+ * 仅使用实体重叠 + TF-IDF 余弦相似度。
+ */
+export function matchScoreAgainstReport(
+  instructionText: string,
+  report: string,
+): number {
+  if (!report.trim()) return 0;
+
+  // Entity overlap (weight: 0.5)
+  // 实体重叠（权重 0.5）
+  const instructionEntities = extractEntities(instructionText);
+  const reportEntities = extractEntities(report);
+  const entOverlap = entityOverlap(instructionEntities, reportEntities);
+
+  // TF-IDF cosine similarity (weight: 0.5)
+  // TF-IDF 余弦相似度（权重 0.5）
+  const instructionTokens = tokenize(instructionText);
+  const reportTokens = tokenize(report);
+  const docs = [instructionTokens, reportTokens];
+  const idf = inverseDocFrequency(docs);
+  const vecA = tfidfVector(instructionTokens, idf);
+  const vecB = tfidfVector(reportTokens, idf);
+  const cosine = cosineSimilarity(vecA, vecB);
+
+  return Math.min(entOverlap * 0.5 + cosine * 0.5, 1);
+}
