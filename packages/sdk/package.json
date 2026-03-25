@@ -20,11 +20,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llmagentscore/core": "*"
+    "@llmagentscore/core": "^0.2.1"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "vitest": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Singularity-tian/agentscore.git",
+    "directory": "packages/sdk"
   },
   "license": "MIT"
 }

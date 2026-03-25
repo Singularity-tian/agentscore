@@ -32,21 +32,49 @@ jobs:
         run: npx turbo build
 
       - name: Publish @llmagentscore/core
-        run: npm publish --workspace packages/core --provenance --access public
+        run: |
+          CURRENT=$(npm view @llmagentscore/core version 2>/dev/null || echo "0.0.0")
+          LOCAL=$(node -p "require('./packages/core/package.json').version")
+          if [ "$CURRENT" != "$LOCAL" ]; then
+            npm publish --workspace packages/core --provenance --access public
+          else
+            echo "Skipping @llmagentscore/core — $LOCAL already published"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish agentscore (CLI)
-        run: npm publish --workspace packages/cli --provenance --access public
+        run: |
+          CURRENT=$(npm view agentscore version 2>/dev/null || echo "0.0.0")
+          LOCAL=$(node -p "require('./packages/cli/package.json').version")
+          if [ "$CURRENT" != "$LOCAL" ]; then
+            npm publish --workspace packages/cli --provenance --access public
+          else
+            echo "Skipping agentscore — $LOCAL already published"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @llmagentscore/sdk
-        run: npm publish --workspace packages/sdk --provenance --access public
+        run: |
+          CURRENT=$(npm view @llmagentscore/sdk version 2>/dev/null || echo "0.0.0")
+          LOCAL=$(node -p "require('./packages/sdk/package.json').version")
+          if [ "$CURRENT" != "$LOCAL" ]; then
+            npm publish --workspace packages/sdk --provenance --access public
+          else
+            echo "Skipping @llmagentscore/sdk — $LOCAL already published"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @llmagentscore/agentscore-openclaw
-        run: npm publish --workspace plugins/openclaw --provenance --access public
+        run: |
+          CURRENT=$(npm view @llmagentscore/agentscore-openclaw version 2>/dev/null || echo "0.0.0")
+          LOCAL=$(node -p "require('./plugins/openclaw/package.json').version")
+          if [ "$CURRENT" != "$LOCAL" ]; then
+            npm publish --workspace plugins/openclaw --provenance --access public
+          else
+            echo "Skipping @llmagentscore/agentscore-openclaw — $LOCAL already published"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

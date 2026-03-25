@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llmagentscore/core": "*"
+    "@llmagentscore/core": "^0.2.1"
   },
   "peerDependencies": {
     "openclaw": ">=2026.1.29"
@@ -31,6 +31,11 @@
     "@types/node": "^25.5.0",
     "openclaw": "2026.3.23-2",
     "vitest": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Singularity-tian/agentscore.git",
+    "directory": "plugins/openclaw"
   },
   "license": "MIT"
 }
