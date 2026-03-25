@@ -398,6 +398,9 @@ export default {
   register(api: OpenClawPluginApi) {
     const cfg = resolveConfig(api.pluginConfig ?? {});
     const lastUploadAt = new Map<string, number>();
+    // Track the last uploaded task count per session to only upload new tasks
+    // 跟踪每个 session 上次上传的 task 数量，只上传新增的 tasks
+    const lastUploadedTaskCount = new Map<string, number>();
 
     // Use api.on() for typed plugin hooks (works for both webchat and channels)
     // 使用 api.on() 注册 typed plugin hook（webchat 和 channel 都会触发）
@@ -411,6 +414,10 @@ export default {
 
         if (!event.success) return;
 
+        // Skip internal temporary agents (e.g. slug-generator)
+        // 跳过内部临时 agent（如 slug-generator）
+        if (sessionKey.startsWith("temp:")) return;
+
         const now = Date.now();
         const last = lastUploadAt.get(sessionKey) ?? 0;
         if (now - last < cfg.throttleMs) return;
@@ -420,20 +427,33 @@ export default {
         const groups = splitMessagesIntoTasks(event.messages ?? []);
         const sessionStartMs = now - (event.durationMs ?? 0);
 
-        const taskSlices = groups
+        const allTaskSlices = groups
           .map((group, idx) => buildTaskSlice(group, sessionStartMs, idx))
           .filter((s): s is TaskSlice => s !== null);
 
-        if (taskSlices.length === 0) {
+        if (allTaskSlices.length === 0) {
           console.log(`[agentscore] no valid tasks found, skipping`);
           return;
         }
 
-        console.log(`[agentscore] split into ${taskSlices.length} tasks`);
+        // Only upload tasks that haven't been uploaded yet
+        // 只上传尚未上传的新 tasks
+        const previousCount = lastUploadedTaskCount.get(sessionKey) ?? 0;
+        const taskSlices = allTaskSlices.slice(previousCount);
 
-        // Record throttle timestamp before async upload
-        // 在异步上传前记录节流时间戳
+        if (taskSlices.length === 0) {
+          console.log(`[agentscore] no new tasks since last upload, skipping`);
+          return;
+        }
+
+        console.log(
+          `[agentscore] split into ${allTaskSlices.length} tasks, ${taskSlices.length} new (${previousCount} already uploaded)`,
+        );
+
+        // Record throttle timestamp and task count before async upload
+        // 在异步上传前记录节流时间戳和 task 数量
         lastUploadAt.set(sessionKey, now);
+        lastUploadedTaskCount.set(sessionKey, allTaskSlices.length);
 
         // Fire-and-forget batch upload
         // 后台批量上传
