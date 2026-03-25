@@ -55,7 +55,7 @@ ${prompt}`;
     return llm.generateStructured(systemPrompt, extractCheckpointsResponseSchema);
 }
 // ── Pipeline Step 2: Verify Checkpoints ────────────────
-async function verifyCheckpoints(checkpoints, actions, llm) {
+async function verifyCheckpoints(checkpoints, actions, report, llm) {
     const nonConstraints = checkpoints.filter((cp) => !cp.isConstraint);
     if (nonConstraints.length === 0) {
         return { results: [] };
@@ -70,6 +70,7 @@ Rules:
 - Set confidence between 0 and 1 based on how well the action matches.
 - Set matchedActionIndex to the index of the best matching action, or null if no match.
 - Each action can only match one checkpoint. If multiple checkpoints could match the same action, assign it to the best match.
+- Some checkpoints may be fulfilled by the agent's text reply (report) rather than a tool call. For example, "tell the user the result" or "report what you found" can be satisfied if the report text contains the relevant information. In that case, set passed: true, matchedActionIndex: null, and explain in reasoning that the checkpoint was fulfilled via the text reply.
 
 Respond with JSON only, no markdown fences. Schema:
 {
@@ -88,7 +89,10 @@ Checkpoints:
 ${JSON.stringify(nonConstraints, null, 2)}
 
 Actions:
-${JSON.stringify(serializedActions, null, 2)}`;
+${JSON.stringify(serializedActions, null, 2)}
+
+Agent report (text reply to user):
+${report.trim() || "(no report)"}`;
     return llm.generateStructured(systemPrompt, verifyCheckpointsResponseSchema);
 }
 // ── Pipeline Step 3: Check Constraints ─────────────────
@@ -180,7 +184,7 @@ export async function computeAlignmentLLM(input, llm) {
     const constraintCheckpoints = checkpoints.filter((cp) => cp.isConstraint);
     const actionCheckpoints = checkpoints.filter((cp) => !cp.isConstraint);
     // Step 2: Verify action checkpoints
-    const verification = await verifyCheckpoints(actionCheckpoints, actions, llm);
+    const verification = await verifyCheckpoints(actionCheckpoints, actions, report, llm);
     // Step 3: Check constraints (only if there are constraint checkpoints)
     const constraintResults = constraintCheckpoints.length > 0
         ? await checkConstraints(constraintCheckpoints, actions, llm)
@@ -205,6 +209,16 @@ export async function computeAlignmentLLM(input, llm) {
                 reasoning: result.reasoning,
             });
             matchedActionIndices.add(result.matchedActionIndex);
+        }
+        else if (result.passed && result.matchedActionIndex === null) {
+            // Checkpoint fulfilled via text reply, not a tool call
+            // checkpoint 通过文本回复完成，而非 tool call
+            matched.push({
+                expected: checkpoint.description,
+                actual: { tool: "(text reply)", params: {}, timestamp: new Date().toISOString() },
+                confidence: result.confidence,
+                reasoning: result.reasoning,
+            });
         }
         else {
             missed.push(checkpoint.description);

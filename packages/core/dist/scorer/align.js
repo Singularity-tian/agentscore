@@ -1,5 +1,5 @@
 import { parsePrompt } from '../parser/prompt.js';
-import { matchScore } from '../utils/semantic.js';
+import { matchScore, matchScoreAgainstReport } from '../utils/semantic.js';
 import { computeTruthfulness } from './truthful.js';
 /** Match confidence thresholds */
 const MATCH_THRESHOLD = 0.4;
@@ -44,7 +44,19 @@ export function computeAlignment(input) {
             usedActions.add(bestIndex);
         }
         else {
-            missed.push(instruction.text);
+            // Fallback: check if the instruction was fulfilled via text reply
+            // 兜底：检查指令是否通过文本回复完成
+            const reportScore = matchScoreAgainstReport(instruction.text, report);
+            if (reportScore >= MATCH_THRESHOLD) {
+                matched.push({
+                    expected: instruction.text,
+                    actual: { tool: "(text reply)", params: {}, timestamp: new Date().toISOString() },
+                    confidence: reportScore,
+                });
+            }
+            else {
+                missed.push(instruction.text);
+            }
         }
     }
     // Step 3: Detect unexpected actions (not matched to any instruction)
