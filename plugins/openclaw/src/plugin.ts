@@ -164,17 +164,22 @@ function buildTaskSlice(
   fallbackStartMs: number,
   groupIndex: number,
 ): TaskSlice | null {
-  // Collect all user message texts as prompt
-  // 收集所有用户消息文本作为 prompt
+  // Collect user message texts as prompt, skipping bootstrap/system-injected messages
+  // 收集用户消息文本作为 prompt，跳过 bootstrap/系统注入的消息
+  const BOOTSTRAP_PREFIX = "A new session was started via";
   const promptParts: string[] = [];
   for (const msg of group) {
     if (msg.role === "user") {
       const text = extractText(msg.content);
-      if (text) promptParts.push(text);
+      if (!text) continue;
+      // Skip OpenClaw bootstrap messages (session startup instructions)
+      // 跳过 OpenClaw bootstrap 消息（会话启动指令）
+      if (text.startsWith(BOOTSTRAP_PREFIX)) continue;
+      promptParts.push(text);
     }
   }
   const prompt = promptParts.join("\n\n");
-  if (!prompt) return null; // API requires prompt.min(1)
+  if (!prompt) return null; // API requires prompt.min(1), also filters pure bootstrap groups
 
   // Collect all assistant text as report
   // 收集所有 assistant 文本作为 report
@@ -449,6 +454,7 @@ export default {
         console.log(
           `[agentscore] split into ${allTaskSlices.length} tasks, ${taskSlices.length} new (${previousCount} already uploaded)`,
         );
+
 
         // Record throttle timestamp and task count before async upload
         // 在异步上传前记录节流时间戳和 task 数量
