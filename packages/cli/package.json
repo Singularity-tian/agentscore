@@ -1,5 +1,5 @@
 {
-  "name": "agentscore",
+  "name": "@llmagentscore/cli",
   "version": "0.1.0",
   "description": "CLI tool for scoring AI agent alignment",
   "type": "module",

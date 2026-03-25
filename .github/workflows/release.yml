@@ -43,14 +43,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish agentscore (CLI)
+      - name: Publish @llmagentscore/cli
         run: |
-          CURRENT=$(npm view agentscore version 2>/dev/null || echo "0.0.0")
+          CURRENT=$(npm view @llmagentscore/cli version 2>/dev/null || echo "0.0.0")
           LOCAL=$(node -p "require('./packages/cli/package.json').version")
           if [ "$CURRENT" != "$LOCAL" ]; then
             npm publish --workspace packages/cli --provenance --access public
           else
-            echo "Skipping agentscore — $LOCAL already published"
+            echo "Skipping @llmagentscore/cli — $LOCAL already published"
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

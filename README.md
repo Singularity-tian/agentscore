@@ -17,7 +17,7 @@ AgentScore compares **what the user asked** (prompt) → **what the agent did** 
 | Package | Description |
 |---------|-------------|
 | [`@llmagentscore/core`](packages/core) | Scoring engine — pure functions, zero runtime deps |
-| [`agentscore`](packages/cli) | CLI for scoring sessions from the terminal |
+| [`@llmagentscore/cli`](packages/cli) | CLI for scoring sessions from the terminal |
 | [`@llmagentscore/sdk`](packages/sdk) | SDK for integrating scoring into custom agents |
 | [`@llmagentscore/agentscore-openclaw`](plugins/openclaw) | OpenClaw plugin |
 
@@ -30,7 +30,7 @@ Point your agent at [`getagentscore.com/skill.md`](https://getagentscore.com/ski
 ### CLI
 
 ```bash
-npm install -g agentscore
+npm install -g @llmagentscore/cli
 
 # Score a session file
 agentscore check -p ./session.json
