@@ -137,13 +137,20 @@ function splitMessagesIntoTasks(messages: AgentMessage[]): AgentMessage[][] {
   if (!messages.length) return [];
   const groups: AgentMessage[][] = [];
   let current: AgentMessage[] = [];
+  let hasAssistantInGroup = false;
 
   for (const msg of messages) {
-    if (msg.role === "user" && current.length > 0) {
-      // User message starts a new group; push the previous one
-      // 用户消息开始新分组；保存上一个分组
+    // Only split when a user message follows an assistant response;
+    // consecutive user messages (e.g. user interrupted or gateway restarted) stay in one group
+    // 只在 user 消息出现在 assistant 回复之后时切分；
+    // 连续的 user 消息（如用户打断或 gateway 重启）保持在同一组
+    if (msg.role === "user" && current.length > 0 && hasAssistantInGroup) {
       groups.push(current);
       current = [];
+      hasAssistantInGroup = false;
+    }
+    if (msg.role === "assistant") {
+      hasAssistantInGroup = true;
     }
     current.push(msg);
   }
