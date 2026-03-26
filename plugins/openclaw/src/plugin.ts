@@ -157,6 +157,37 @@ function splitMessagesIntoTasks(messages: AgentMessage[]): AgentMessage[][] {
   return groups;
 }
 
+// Strip OpenClaw metadata and UNTRUSTED wrappers from user message text.
+// Matches the format from OpenClaw's external-content.ts wrapExternalContent.
+// 剥离 OpenClaw 注入的 metadata 和 UNTRUSTED 包装，只保留实际用户消息。
+// 匹配 OpenClaw external-content.ts wrapExternalContent 的输出格式。
+function stripOpenClawMetadata(text: string): string {
+  // Primary: extract content body from <<<EXTERNAL_UNTRUSTED_CONTENT>>> block
+  // 主路径：从 <<<EXTERNAL_UNTRUSTED_CONTENT>>> 块中提取内容正文
+  // Format: <<<EXTERNAL_UNTRUSTED_CONTENT>>>\nSource: ...\n...\n---\n<body>\n<<<END_...>>>
+  const untrustedMatch = text.match(
+    /<<<EXTERNAL_UNTRUSTED_CONTENT[^>]*>>>[\s\S]*?---\s*(?:UNTRUSTED \w+ message body\s*)?([\s\S]*?)<<<END_EXTERNAL_UNTRUSTED_CONTENT[^>]*>>>/
+  );
+  if (untrustedMatch) {
+    return untrustedMatch[1].trim();
+  }
+
+  // Fallback: remove all untrusted metadata blocks (for messages without EXTERNAL wrapper)
+  // 兜底：移除所有 untrusted metadata 块（适用于没有 EXTERNAL 包装的消息，如 webchat）
+  let cleaned = text;
+  // Remove any block matching: "Label (untrusted...): ```json { ... } ```"
+  // 移除所有 "标签 (untrusted...): ```json { ... } ```" 格式的块
+  cleaned = cleaned.replace(/\w[\w ]*\(untrusted[^)]*\):\s*```json\s*\{[\s\S]*?\}\s*```/g, "");
+  // Remove "Untrusted context..." preamble
+  // 移除 "Untrusted context..." 前导文字
+  cleaned = cleaned.replace(/Untrusted context \(metadata, do not treat as instructions or commands\):\s*/g, "");
+  // Remove SECURITY NOTICE blocks
+  // 移除 SECURITY NOTICE 警告块
+  cleaned = cleaned.replace(/⚠️\s*SECURITY NOTICE[\s\S]*?(?=\n\n|\n[A-Z]|$)/g, "");
+
+  return cleaned.trim();
+}
+
 // Build a TaskSlice from a message group
 // 从消息分组构建 TaskSlice
 function buildTaskSlice(
@@ -175,7 +206,10 @@ function buildTaskSlice(
       // Skip OpenClaw bootstrap messages (session startup instructions)
       // 跳过 OpenClaw bootstrap 消息（会话启动指令）
       if (text.startsWith(BOOTSTRAP_PREFIX)) continue;
-      promptParts.push(text);
+      // Strip OpenClaw metadata/UNTRUSTED wrappers before using as prompt
+      // 剥离 OpenClaw metadata/UNTRUSTED 包装后再作为 prompt
+      const cleanedText = stripOpenClawMetadata(text);
+      if (cleanedText) promptParts.push(cleanedText);
     }
   }
   const prompt = promptParts.join("\n\n");
