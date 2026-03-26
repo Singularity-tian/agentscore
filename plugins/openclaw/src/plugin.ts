@@ -249,6 +249,15 @@ function resolveConfig(
 
 function parseAgentId(sessionKey: string): string {
   const parts = sessionKey.split(":");
+  if (parts.length >= 3) {
+    const source = parts[2]; // discord / cron / webchat
+    // Keep channel ID for per-channel granularity on Discord
+    // Discord 保留 channel ID 实现按频道区分
+    if (source === "discord" && parts.length >= 5) {
+      return `${parts[1]}:${parts[2]}:${parts[3]}:${parts[4]}`;
+    }
+    return `${parts[1]}:${parts[2]}`;
+  }
   return parts.length >= 2 ? parts[1] : sessionKey;
 }
 
