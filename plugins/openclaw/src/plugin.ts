@@ -199,6 +199,7 @@ function buildTaskSlice(
   // Collect user message texts as prompt, skipping bootstrap/system-injected messages
   // 收集用户消息文本作为 prompt，跳过 bootstrap/系统注入的消息
   const BOOTSTRAP_PREFIX = "A new session was started via";
+  const HEARTBEAT_PREFIX = "Read HEARTBEAT.md if it exists";
   const promptParts: string[] = [];
   for (const msg of group) {
     if (msg.role === "user") {
@@ -207,6 +208,9 @@ function buildTaskSlice(
       // Skip OpenClaw bootstrap messages (session startup instructions)
       // 跳过 OpenClaw bootstrap 消息（会话启动指令）
       if (text.startsWith(BOOTSTRAP_PREFIX)) continue;
+      // Skip OpenClaw system heartbeat messages (periodic health checks)
+      // 跳过 OpenClaw 系统心跳消息（定期健康检查）
+      if (text.startsWith(HEARTBEAT_PREFIX)) continue;
       // Strip OpenClaw metadata/UNTRUSTED wrappers before using as prompt
       // 剥离 OpenClaw metadata/UNTRUSTED 包装后再作为 prompt
       const cleanedText = stripOpenClawMetadata(text);
