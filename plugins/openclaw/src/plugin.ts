@@ -208,13 +208,14 @@ function buildTaskSlice(
       // Skip OpenClaw bootstrap messages (session startup instructions)
       // 跳过 OpenClaw bootstrap 消息（会话启动指令）
       if (text.startsWith(BOOTSTRAP_PREFIX)) continue;
-      // Skip OpenClaw system heartbeat messages (periodic health checks)
-      // 跳过 OpenClaw 系统心跳消息（定期健康检查）
-      if (text.startsWith(HEARTBEAT_PREFIX)) continue;
       // Strip OpenClaw metadata/UNTRUSTED wrappers before using as prompt
       // 剥离 OpenClaw metadata/UNTRUSTED 包装后再作为 prompt
       const cleanedText = stripOpenClawMetadata(text);
-      if (cleanedText) promptParts.push(cleanedText);
+      if (!cleanedText) continue;
+      // Skip OpenClaw system heartbeat messages (periodic health checks)
+      // 跳过 OpenClaw 系统心跳消息（定期健康检查）
+      if (cleanedText.startsWith(HEARTBEAT_PREFIX)) continue;
+      promptParts.push(cleanedText);
     }
   }
   const prompt = promptParts.join("\n\n");
