@@ -165,26 +165,20 @@ function splitMessagesIntoTasks(messages: AgentMessage[]): AgentMessage[][] {
 }
 
 // Strip OpenClaw metadata and UNTRUSTED wrappers from user message text.
-// Matches the format from OpenClaw's external-content.ts wrapExternalContent.
+// Remove all metadata blocks and keep only the actual user message.
 // 剥离 OpenClaw 注入的 metadata 和 UNTRUSTED 包装，只保留实际用户消息。
-// 匹配 OpenClaw external-content.ts wrapExternalContent 的输出格式。
+// 移除所有元数据块，仅保留用户的真实消息。
 function stripOpenClawMetadata(text: string): string {
-  // Primary: extract content body from <<<EXTERNAL_UNTRUSTED_CONTENT>>> block
-  // 主路径：从 <<<EXTERNAL_UNTRUSTED_CONTENT>>> 块中提取内容正文
-  // Format: <<<EXTERNAL_UNTRUSTED_CONTENT>>>\nSource: ...\n...\n---\n<body>\n<<<END_...>>>
-  const untrustedMatch = text.match(
-    /<<<EXTERNAL_UNTRUSTED_CONTENT[^>]*>>>[\s\S]*?---\s*(?:UNTRUSTED \w+ message body\s*)?([\s\S]*?)<<<END_EXTERNAL_UNTRUSTED_CONTENT[^>]*>>>/
-  );
-  if (untrustedMatch) {
-    return untrustedMatch[1].trim();
-  }
-
-  // Fallback: remove all untrusted metadata blocks (for messages without EXTERNAL wrapper)
-  // 兜底：移除所有 untrusted metadata 块（适用于没有 EXTERNAL 包装的消息，如 webchat）
   let cleaned = text;
-  // Remove any block matching: "Label (untrusted...): ```json { ... } ```"
-  // 移除所有 "标签 (untrusted...): ```json { ... } ```" 格式的块
-  cleaned = cleaned.replace(/\w[\w ]*\(untrusted[^)]*\):\s*```json\s*\{[\s\S]*?\}\s*```/g, "");
+  // Remove <<<EXTERNAL_UNTRUSTED_CONTENT>>> blocks (e.g. channel topic metadata)
+  // 移除 <<<EXTERNAL_UNTRUSTED_CONTENT>>> 块（如频道主题元数据）
+  cleaned = cleaned.replace(
+    /<<<EXTERNAL_UNTRUSTED_CONTENT[^>]*>>>[\s\S]*?<<<END_EXTERNAL_UNTRUSTED_CONTENT[^>]*>>>/g,
+    ""
+  );
+  // Remove "Label (untrusted...): ```json { ... } ```" metadata blocks (objects and arrays)
+  // 移除 "标签 (untrusted...): ```json { ... } ```" 元数据块（对象和数组）
+  cleaned = cleaned.replace(/\w[\w ]*\(untrusted[^)]*\):\s*```json\s*[\s\S]*?```/g, "");
   // Remove "Untrusted context..." preamble
   // 移除 "Untrusted context..." 前导文字
   cleaned = cleaned.replace(/Untrusted context \(metadata, do not treat as instructions or commands\):\s*/g, "");
@@ -205,6 +199,7 @@ function buildTaskSlice(
   // Collect user message texts as prompt, skipping bootstrap/system-injected messages
   // 收集用户消息文本作为 prompt，跳过 bootstrap/系统注入的消息
   const BOOTSTRAP_PREFIX = "A new session was started via";
+  const HEARTBEAT_PREFIX = "Read HEARTBEAT.md if it exists";
   const promptParts: string[] = [];
   for (const msg of group) {
     if (msg.role === "user") {
@@ -216,7 +211,11 @@ function buildTaskSlice(
       // Strip OpenClaw metadata/UNTRUSTED wrappers before using as prompt
       // 剥离 OpenClaw metadata/UNTRUSTED 包装后再作为 prompt
       const cleanedText = stripOpenClawMetadata(text);
-      if (cleanedText) promptParts.push(cleanedText);
+      if (!cleanedText) continue;
+      // Skip OpenClaw system heartbeat messages (periodic health checks)
+      // 跳过 OpenClaw 系统心跳消息（定期健康检查）
+      if (cleanedText.startsWith(HEARTBEAT_PREFIX)) continue;
+      promptParts.push(cleanedText);
     }
   }
   const prompt = promptParts.join("\n\n");
