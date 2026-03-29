@@ -1,5 +1,7 @@
 /**
- * Tokenize text into lowercase words, removing stop words and punctuation.
+ * Tokenize text into tokens for TF-IDF computation.
+ * Supports both Latin (word-based) and CJK (bigram-based) text.
+ * 将文本分词用于 TF-IDF 计算。支持拉丁文（基于词）和 CJK（基于双元组）文本。
  */
 export declare function tokenize(text: string): string[];
 /**

@@ -65,3 +65,36 @@ describe('computeTruthfulness', () => {
     expect(unverified).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('computeTruthfulness CJK', () => {
+  it('should extract claims from Chinese report', () => {
+    const report = '从 Reddit 页面抓取的信息来看：u/test 的 Karma 为 1';
+    const actions: AgentAction[] = [
+      { tool: 'web_fetch', params: { url: 'https://www.reddit.com/user/test' }, timestamp: '' },
+    ];
+    const result = computeTruthfulness(report, actions);
+    // CJK claims are now extracted (previously 0 due to English-only verb filter)
+    // CJK claim 现在能被提取出来（之前因英文动词过滤器导致提取 0 个）
+    expect(result.claims.length).toBeGreaterThan(0);
+  });
+
+  it('should not extract short CJK fragments as claims', () => {
+    const report = '完成。好的。如下。';
+    const actions: AgentAction[] = [
+      { tool: 'exec', params: { command: 'echo ok' }, timestamp: '' },
+    ];
+    const result = computeTruthfulness(report, actions);
+    expect(result.claims.length).toBe(0);
+    expect(result.score).toBe(100);
+  });
+
+  it('should not regress English report behavior', () => {
+    const report = 'I sent an email to bob. The weather is nice.';
+    const actions: AgentAction[] = [
+      { tool: 'gmail_send', params: { to: 'bob@example.com' }, timestamp: '' },
+    ];
+    const result = computeTruthfulness(report, actions);
+    expect(result.claims.length).toBe(1);
+    expect(result.claims[0].claimed).toContain('sent');
+  });
+});
