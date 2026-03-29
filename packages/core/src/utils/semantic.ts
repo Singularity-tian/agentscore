@@ -16,15 +16,43 @@ const STOP_WORDS = new Set([
   'my', 'your', 'his', 'her', 'our', 'their', 'me', 'him', 'us', 'them',
 ]);
 
+const CJK_RANGE = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7a3]/;
+
 /**
- * Tokenize text into lowercase words, removing stop words and punctuation.
+ * Tokenize text into tokens for TF-IDF computation.
+ * Supports both Latin (word-based) and CJK (bigram-based) text.
+ * 将文本分词用于 TF-IDF 计算。支持拉丁文（基于词）和 CJK（基于双元组）文本。
  */
 export function tokenize(text: string): string[] {
+  if (CJK_RANGE.test(text)) {
+    return tokenizeCJK(text);
+  }
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter((word) => word.length > 1 && !STOP_WORDS.has(word));
+}
+
+function tokenizeCJK(text: string): string[] {
+  const tokens: string[] = [];
+  // Extract Latin words from mixed text
+  // 从混合文本中提取拉丁词汇
+  const latinWords = text.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !STOP_WORDS.has(w));
+  tokens.push(...latinWords);
+  // Extract CJK character bigrams
+  // 提取 CJK 字符双元组
+  const cjkChars = text.replace(/[^\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7a3]/g, '');
+  for (let i = 0; i < cjkChars.length - 1; i++) {
+    tokens.push(cjkChars[i] + cjkChars[i + 1]);
+  }
+  for (const char of cjkChars) {
+    tokens.push(char);
+  }
+  return tokens;
 }
 
 /**

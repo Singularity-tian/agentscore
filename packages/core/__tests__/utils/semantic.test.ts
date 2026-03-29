@@ -4,7 +4,6 @@ import {
   cosineSimilarity,
   termFrequency,
   inverseDocFrequency,
-  tfidfVector,
   matchScore,
 } from '../../src/utils/semantic.js';
 
@@ -71,6 +70,31 @@ describe('cosineSimilarity', () => {
     const sim = cosineSimilarity(a, b);
     expect(sim).toBeGreaterThan(0);
     expect(sim).toBeLessThan(1);
+  });
+});
+
+describe('tokenize CJK', () => {
+  it('should produce bigram + Latin tokens from Chinese text', () => {
+    const tokens = tokenize('从 Reddit 页面抓取的信息');
+    expect(tokens).toContain('reddit');
+    expect(tokens).toContain('页面');
+    expect(tokens).toContain('抓取');
+    expect(tokens.length).toBeGreaterThan(3);
+  });
+
+  it('should include CJK unigrams', () => {
+    const tokens = tokenize('查找数据');
+    expect(tokens).toContain('查');
+    expect(tokens).toContain('找');
+    expect(tokens).toContain('查找');
+  });
+
+  it('should not affect pure English text', () => {
+    const tokens = tokenize('sent an email to bob');
+    expect(tokens).toContain('sent');
+    expect(tokens).toContain('email');
+    expect(tokens).toContain('bob');
+    expect(tokens).not.toContain('an');
   });
 });
 
