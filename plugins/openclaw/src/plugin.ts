@@ -189,6 +189,13 @@ function stripOpenClawMetadata(text: string): string {
   return cleaned.trim();
 }
 
+// Extract channel name from OpenClaw metadata before stripping
+// 在剥离 metadata 前从 OpenClaw 元数据中提取频道名称
+function extractChannelName(text: string): string | null {
+  const match = text.match(/"group_channel"\s*:\s*"([^"]+)"/);
+  return match ? match[1] : null;
+}
+
 // Build a TaskSlice from a message group
 // 从消息分组构建 TaskSlice
 function buildTaskSlice(
@@ -362,6 +369,7 @@ async function uploadBatchToRemote(
   sessionKey: string,
   apiKey: string,
   dashboardUrl: string,
+  displayName?: string,
 ): Promise<boolean> {
   const agentName = parseAgentId(sessionKey);
   const url = `${dashboardUrl}/api/v1/score`;
@@ -373,6 +381,9 @@ async function uploadBatchToRemote(
     const batch = taskSlices.slice(i, i + BATCH_SIZE);
     const payload = {
       agentName,
+      // Pass channel name as display name for dashboard
+      // 将频道名称作为备注名传给 dashboard
+      ...(displayName ? { displayName } : {}),
       framework: "openclaw" as const,
       source: "sdk" as const,
       tasks: batch.map((t) => ({
@@ -510,6 +521,20 @@ export default {
         lastUploadAt.set(sessionKey, now);
         lastUploadedTaskCount.set(sessionKey, allTaskSlices.length);
 
+        // Extract channel name from first user message metadata (before it's stripped)
+        // 从第一条用户消息的 metadata 中提取频道名称（在剥离前）
+        let channelName: string | undefined;
+        const messages = event.messages ?? [];
+        for (const msg of messages) {
+          if (msg.role === "user") {
+            const rawText = extractText(msg.content);
+            if (rawText) {
+              channelName = extractChannelName(rawText) ?? undefined;
+              break;
+            }
+          }
+        }
+
         // Fire-and-forget batch upload
         // 后台批量上传
         if (cfg.apiKey) {
@@ -518,6 +543,7 @@ export default {
             sessionKey,
             cfg.apiKey,
             cfg.dashboardUrl,
+            channelName,
           ).catch(() => {
             /* already logged inside uploadBatchToRemote */
           });
