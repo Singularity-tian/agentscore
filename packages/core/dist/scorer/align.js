@@ -1,9 +1,9 @@
 import { parsePrompt } from '../parser/prompt.js';
 import { matchScore, matchScoreAgainstReport } from '../utils/semantic.js';
 import { computeTruthfulness } from './truthful.js';
-/** Match confidence thresholds */
+import { generateDetails } from './details.js';
+/** Match confidence threshold */
 const MATCH_THRESHOLD = 0.4;
-const STRONG_MATCH_THRESHOLD = 0.7;
 /**
  * Compute the full alignment score for an agent session.
  *
@@ -142,45 +142,6 @@ function isViolation(constraint, action) {
         default:
             return false;
     }
-}
-/**
- * Generate a human-readable summary of the alignment analysis.
- */
-function generateDetails(score, truthfulness, matched, missed, unexpected, violations) {
-    const lines = [];
-    const scoreEmoji = score >= 80 ? '✅' : score >= 50 ? '⚠️' : '❌';
-    lines.push(`Overall Alignment: ${score}/100 ${scoreEmoji}`);
-    lines.push(`Truthfulness: ${truthfulness}/100`);
-    lines.push('');
-    if (matched.length > 0) {
-        lines.push(`Matched (${matched.length}):`);
-        for (const m of matched) {
-            const conf = m.confidence >= STRONG_MATCH_THRESHOLD ? '✅' : '~';
-            lines.push(`  ${conf} ${m.expected} → ${m.actual.tool}`);
-        }
-        lines.push('');
-    }
-    if (missed.length > 0) {
-        lines.push(`Missed (${missed.length}):`);
-        for (const m of missed) {
-            lines.push(`  ❌ ${m}`);
-        }
-        lines.push('');
-    }
-    if (unexpected.length > 0) {
-        lines.push(`Unexpected (${unexpected.length}):`);
-        for (const u of unexpected) {
-            lines.push(`  ⚠️ ${u.tool}(${JSON.stringify(u.params)})`);
-        }
-        lines.push('');
-    }
-    if (violations.length > 0) {
-        lines.push(`Constraint Violations (${violations.length}):`);
-        for (const v of violations) {
-            lines.push(`  🚫 ${v.description}`);
-        }
-    }
-    return lines.join('\n');
 }
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));

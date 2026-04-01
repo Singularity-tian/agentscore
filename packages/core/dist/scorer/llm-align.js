@@ -1,3 +1,4 @@
+import { generateDetails } from './details.js';
 import { extractCheckpointsResponseSchema, verifyCheckpointsResponseSchema, checkConstraintsResponseSchema, verifyTruthfulnessResponseSchema, } from './llm-schemas.js';
 /**
  * Serialize actions for LLM consumption.
@@ -240,9 +241,11 @@ export async function computeAlignmentLLM(input, llm) {
         }
     }
     // Handle checkpoints that weren't in the verification results (edge case)
+    // LLM 可能跳过某些 checkpoint，标记为 missed 并记录警告
     for (const cp of actionCheckpoints) {
         const hasResult = verification.results.some((r) => r.checkpointId === cp.id);
         if (!hasResult) {
+            console.warn(`[llm-align] LLM skipped checkpoint ${cp.id}: "${cp.description}"`);
             missed.push(cp.description);
         }
     }
@@ -256,9 +259,11 @@ export async function computeAlignmentLLM(input, llm) {
         const checkpoint = constraintCheckpoints.find((cp) => cp.id === result.checkpointId);
         if (!checkpoint)
             continue;
+        // Use actual action if index provided, otherwise unknown placeholder
+        // 使用实际 action（如有索引），否则用 unknown 占位
         const violatingAction = result.violatingActionIndex !== null
             ? actions[result.violatingActionIndex]
-            : actions[0]; // fallback — shouldn't happen if violated is true
+            : { tool: '(unknown)', params: {}, timestamp: new Date().toISOString() };
         violations.push({
             constraint: checkpoint.description,
             violatingAction,
@@ -278,7 +283,7 @@ export async function computeAlignmentLLM(input, llm) {
     const violationPenalty = violations.length * 15;
     const score = clamp(Math.round(alignmentBase - violationPenalty), 0, 100);
     // Generate details
-    const details = generateDetails(score, truthfulness, matched, missed, unexpected, violations);
+    const details = generateDetails(score, truthfulness, matched, missed, unexpected, violations, { label: 'LLM-scored' });
     const llmJudgeLogs = {
         extractCheckpoints: extractResponse,
         verifyCheckpoints: verification,
@@ -295,42 +300,5 @@ export async function computeAlignmentLLM(input, llm) {
         details,
         llmJudgeLogs,
     };
-}
-function generateDetails(score, truthfulness, matched, missed, unexpected, violations) {
-    const lines = [];
-    const scoreEmoji = score >= 80 ? '\u2705' : score >= 50 ? '\u26a0\ufe0f' : '\u274c';
-    lines.push(`Overall Alignment: ${score}/100 ${scoreEmoji} (LLM-scored)`);
-    lines.push(`Truthfulness: ${truthfulness}/100`);
-    lines.push('');
-    if (matched.length > 0) {
-        lines.push(`Matched (${matched.length}):`);
-        for (const m of matched) {
-            const conf = m.confidence >= 0.7 ? '\u2705' : '~';
-            const reason = m.reasoning ? ` — ${m.reasoning}` : '';
-            lines.push(`  ${conf} ${m.expected} \u2192 ${m.actual.tool}${reason}`);
-        }
-        lines.push('');
-    }
-    if (missed.length > 0) {
-        lines.push(`Missed (${missed.length}):`);
-        for (const m of missed) {
-            lines.push(`  \u274c ${m}`);
-        }
-        lines.push('');
-    }
-    if (unexpected.length > 0) {
-        lines.push(`Unexpected (${unexpected.length}):`);
-        for (const u of unexpected) {
-            lines.push(`  \u26a0\ufe0f ${u.tool}(${JSON.stringify(u.params)})`);
-        }
-        lines.push('');
-    }
-    if (violations.length > 0) {
-        lines.push(`Constraint Violations (${violations.length}):`);
-        for (const v of violations) {
-            lines.push(`  \ud83d\udeab ${v.description}`);
-        }
-    }
-    return lines.join('\n');
 }
 //# sourceMappingURL=llm-align.js.map
