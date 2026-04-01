@@ -1,6 +1,6 @@
 {
   "name": "@llmagentscore/core",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Alignment scoring engine for AI agents — deterministic + LLM-as-judge pipeline",
   "type": "module",
   "main": "./dist/index.js",
