@@ -66,6 +66,7 @@ Rules:
 - Mark "limit"/"at most"/"no more than" constraints with constraintType: "limit".
 - Extract key entities (email addresses, URLs, filenames, names, numbers) into the entities array.
 - If the expected tool is obvious (e.g., "send email" → gmail_send), include it in expectedTool.
+- If the prompt contains no actionable instructions (e.g., just a user mention like "@someone", a greeting, an emoji, or metadata with no task), return a single checkpoint with description "No actionable instructions provided" and isConstraint: false. Do not fabricate checkpoints from non-instructional content.
 - Use sequential IDs: CP-1, CP-2, etc.
 
 Respond with JSON only, no markdown fences. Schema:
