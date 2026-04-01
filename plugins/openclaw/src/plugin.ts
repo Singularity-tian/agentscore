@@ -185,6 +185,9 @@ function stripOpenClawMetadata(text: string): string {
   // Remove SECURITY NOTICE blocks
   // 移除 SECURITY NOTICE 警告块
   cleaned = cleaned.replace(/⚠️\s*SECURITY NOTICE[\s\S]*?(?=\n\n|\n[A-Z]|$)/g, "");
+  // Remove "System: [timestamp] ..." lines (process exit notifications, cron triggers, messaging events)
+  // 移除 "System: [timestamp] ..." 行（进程退出通知、cron 触发、消息事件）
+  cleaned = cleaned.replace(/^System: \[.*?\].*$/gm, "");
 
   return cleaned.trim();
 }
