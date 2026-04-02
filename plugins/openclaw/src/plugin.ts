@@ -584,7 +584,7 @@ async function dispatchAnalysis(
       body: JSON.stringify({
         message,
         name: 'agentscore-analysis',
-        sessionKey: `monitor:analysis:${Date.now()}`,
+        sessionKey: `ags-monitor:${Date.now()}`,
         wakeMode: 'now',
         deliver: true,
         channel: 'discord',
@@ -712,13 +712,13 @@ export default {
             if (!(config as any).hooks.allowRequestSessionKey) {
               (config as any).hooks.allowRequestSessionKey = true;
               if (!Array.isArray((config as any).hooks.allowedSessionKeyPrefixes)) {
-                (config as any).hooks.allowedSessionKeyPrefixes = ['hook:', 'monitor:'];
+                (config as any).hooks.allowedSessionKeyPrefixes = ['hook:', 'ags-monitor:'];
               } else {
                 if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('hook:')) {
                   (config as any).hooks.allowedSessionKeyPrefixes.push('hook:');
                 }
-                if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('monitor:')) {
-                  (config as any).hooks.allowedSessionKeyPrefixes.push('monitor:');
+                if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('ags-monitor:')) {
+                  (config as any).hooks.allowedSessionKeyPrefixes.push('ags-monitor:');
                 }
               }
               needsRestart = true;
@@ -783,9 +783,11 @@ export default {
         // 跳过内部临时 agent（如 slug-generator）
         if (sessionKey.startsWith("temp:")) return;
 
-        // Skip analysis agent sessions (prevent infinite loop)
-        // 跳过分析 agent 的 session（防止无限循环）
-        if (sessionKey.startsWith("monitor:")) return;
+        // Skip AgentScore analysis agent sessions (prevent infinite loop)
+        // OpenClaw prefixes sessionKey with "agent:main:", so check with includes()
+        // 跳过 AgentScore 分析 agent 的 session（防止无限循环）
+        // OpenClaw 会给 sessionKey 加 "agent:main:" 前缀，所以用 includes() 检测
+        if (sessionKey.includes("ags-monitor:")) return;
 
         const now = Date.now();
         const last = lastUploadAt.get(sessionKey) ?? 0;
