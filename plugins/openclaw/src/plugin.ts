@@ -712,9 +712,14 @@ export default {
             if (!(config as any).hooks.allowRequestSessionKey) {
               (config as any).hooks.allowRequestSessionKey = true;
               if (!Array.isArray((config as any).hooks.allowedSessionKeyPrefixes)) {
-                (config as any).hooks.allowedSessionKeyPrefixes = ['monitor:'];
-              } else if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('monitor:')) {
-                (config as any).hooks.allowedSessionKeyPrefixes.push('monitor:');
+                (config as any).hooks.allowedSessionKeyPrefixes = ['hook:', 'monitor:'];
+              } else {
+                if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('hook:')) {
+                  (config as any).hooks.allowedSessionKeyPrefixes.push('hook:');
+                }
+                if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('monitor:')) {
+                  (config as any).hooks.allowedSessionKeyPrefixes.push('monitor:');
+                }
               }
               needsRestart = true;
             }

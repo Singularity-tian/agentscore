@@ -1,6 +1,6 @@
 {
   "name": "@llmagentscore/agentscore-openclaw",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "AgentScore plugin for OpenClaw — alignment verification on message:sent",
   "type": "module",
   "main": "./dist/index.js",
