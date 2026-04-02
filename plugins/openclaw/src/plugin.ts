@@ -692,18 +692,41 @@ export default {
             // Read current config, update plugin section, write back
             // 读取当前配置，更新 plugin 部分，写回
             const config = await (api as any).runtime.config.loadConfig();
+
+            // Auto-enable hooks if not enabled
+            // 自动启用 hooks（如未启用）
+            let needsRestart = false;
+            if (!(config as any).hooks?.enabled) {
+              if (!(config as any).hooks) (config as any).hooks = {};
+              (config as any).hooks.enabled = true;
+              if (!(config as any).hooks.token) {
+                // Generate a random token
+                // 生成随机 token
+                (config as any).hooks.token = `ags_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+              }
+              needsRestart = true;
+            }
+
+            // Ensure hooks allows monitor: sessionKey prefix
+            // 确保 hooks 允许 monitor: sessionKey 前缀
+            if (!(config as any).hooks.allowRequestSessionKey) {
+              (config as any).hooks.allowRequestSessionKey = true;
+              if (!Array.isArray((config as any).hooks.allowedSessionKeyPrefixes)) {
+                (config as any).hooks.allowedSessionKeyPrefixes = ['monitor:'];
+              } else if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('monitor:')) {
+                (config as any).hooks.allowedSessionKeyPrefixes.push('monitor:');
+              }
+              needsRestart = true;
+            }
+
             const pluginSection = (config.plugins as Record<string, Record<string, unknown>>)?.['agentscore-openclaw']?.config as Record<string, unknown> ?? {};
             pluginSection.analysisDiscordChannelId = ctx.to;
 
-            // Auto-detect hooks URL and token from main config if not set
-            // 如果未设置，自动从主配置中检测 hooks URL 和 token
-            if (!pluginSection.analysisHooksUrl && (config.hooks as any)?.enabled) {
-              const port = (config as any).gateway?.port ?? 18789;
-              pluginSection.analysisHooksUrl = `http://localhost:${port}/hooks/agent`;
-            }
-            if (!pluginSection.analysisHooksToken && (config.hooks as any)?.token) {
-              pluginSection.analysisHooksToken = (config.hooks as any).token;
-            }
+            // Auto-detect hooks URL and token from main config
+            // 从主配置自动检测 hooks URL 和 token
+            const port = (config as any).gateway?.port ?? 18789;
+            pluginSection.analysisHooksUrl = `http://localhost:${port}/hooks/agent`;
+            pluginSection.analysisHooksToken = (config as any).hooks.token;
 
             // Ensure plugin entry exists and write back
             // 确保 plugin 入口存在并写回
@@ -716,14 +739,19 @@ export default {
             // Update in-memory config
             // 更新内存中的配置
             cfg.analysisDiscordChannelId = ctx.to;
-            if (pluginSection.analysisHooksUrl) cfg.analysisHooksUrl = pluginSection.analysisHooksUrl as string;
-            if (pluginSection.analysisHooksToken) cfg.analysisHooksToken = pluginSection.analysisHooksToken as string;
+            cfg.analysisHooksUrl = pluginSection.analysisHooksUrl as string;
+            cfg.analysisHooksToken = pluginSection.analysisHooksToken as string;
+
+            const restartNote = needsRestart
+              ? `\n\n⚠️ Hooks was just enabled — restart/rebuild required for the hooks endpoint to start. After restart, analysis will work automatically.`
+              : '';
 
             return {
               text: `✅ Analysis configured!\n\n` +
                 `Reports will be sent to this channel.\n` +
                 `Hooks URL: ${cfg.analysisHooksUrl}\n` +
-                `Hooks token: ${cfg.analysisHooksToken ? '(set)' : '⚠️ not set — add analysisHooksToken to plugin config'}`
+                `Hooks token: (set)` +
+                restartNote
             };
           } catch (err) {
             return { text: `❌ Failed to write config: ${(err as Error).message}` };

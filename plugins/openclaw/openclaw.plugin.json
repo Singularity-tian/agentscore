@@ -32,6 +32,18 @@
         "type": "string",
         "default": "https://getagentscore.com",
         "description": "Base URL for the AgentScore API."
+      },
+      "analysisDiscordChannelId": {
+        "type": "string",
+        "description": "Discord channel ID to receive analysis reports. Required to enable analysis agent."
+      },
+      "analysisHooksUrl": {
+        "type": "string",
+        "description": "OpenClaw hooks endpoint URL. Auto-derived from gateway config if not set."
+      },
+      "analysisHooksToken": {
+        "type": "string",
+        "description": "OpenClaw hooks auth token. Auto-derived from hooks config if not set."
       }
     }
   },
