@@ -1,6 +1,6 @@
 {
   "name": "@llmagentscore/agentscore-openclaw",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "AgentScore plugin for OpenClaw — alignment verification on message:sent",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llmagentscore/core": "^0.2.1"
+    "@llmagentscore/core": "^0.2.1",
+    "jsonrepair": "^3.13.3"
   },
   "peerDependencies": {
     "openclaw": ">=2026.1.29"

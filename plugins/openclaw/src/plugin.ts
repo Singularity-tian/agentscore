@@ -1,4 +1,5 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { jsonrepair } from "jsonrepair";
 import {
   computeAlignment,
   type AgentSession,
@@ -152,9 +153,52 @@ const EMBED_COLOR_SUCCESS = 0x22c55e; // green for completed
 const EMBED_COLOR_FAIL = 0xef4444;    // red for not completed
 const EMBED_COLOR_WARN = 0xeab308;    // yellow for partial / fallback
 
+const STATUS_COLOR_MAP: Record<string, number> = {
+  completed: EMBED_COLOR_SUCCESS,
+  not_completed: EMBED_COLOR_FAIL,
+  partial: EMBED_COLOR_WARN,
+  skipped: EMBED_COLOR_SKIP,
+};
+
+const STATUS_EMOJI_MAP: Record<string, string> = {
+  completed: '✅',
+  not_completed: '❌',
+  partial: '⚠️',
+  skipped: '⏭️',
+};
+
+/**
+ * Parse LLM analysis output as JSON with repair fallback.
+ * 解析 LLM 分析输出为 JSON，支持修复不合法 JSON。
+ */
+function parseAnalysisJson(raw: string): {
+  status?: string;
+  skipReason?: string;
+  taskCompletion?: string;
+  issues?: unknown;
+  suggestions?: unknown;
+} | null {
+  try {
+    // Strip markdown code fences if present
+    // 去掉 markdown 代码块包裹
+    let cleaned = raw.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+    // Extract first JSON object if surrounded by text
+    // 从文本中提取第一个 { ... } 对象
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) cleaned = match[0];
+    // Repair and parse
+    // 修复并解析
+    return JSON.parse(jsonrepair(cleaned));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Build a Discord embed object from analysis agent output + cached header info.
+ * Attempts to parse JSON output; falls back to raw text on failure.
  * 根据分析 agent 的输出和缓存的 header 信息构建 Discord embed 对象。
+ * 尝试解析 JSON 输出；失败时回退到原始文本。
  */
 function buildAnalysisEmbed(
   raw: string,
@@ -164,39 +208,57 @@ function buildAnalysisEmbed(
   const footer = headerInfo ? { text: headerInfo.timeLabel } : undefined;
   const promptLine = headerInfo ? `> ${headerInfo.promptPreview}` : '';
 
-  // Skipped session
-  // 跳过的 session
-  if (raw.startsWith('⏭️')) {
-    return {
-      embeds: [{
-        title,
-        description: [promptLine, '', raw].filter(Boolean).join('\n'),
-        color: EMBED_COLOR_SKIP,
-        footer,
-      }],
-    };
+  const parsed = parseAnalysisJson(raw);
+
+  // JSON parse succeeded — build structured embed
+  // JSON 解析成功 — 构建结构化 embed
+  if (parsed && typeof parsed.status === 'string') {
+    const color = STATUS_COLOR_MAP[parsed.status] ?? EMBED_COLOR_WARN;
+    const emoji = STATUS_EMOJI_MAP[parsed.status] ?? '📋';
+
+    // Skipped session
+    // 跳过的 session
+    if (parsed.status === 'skipped') {
+      return {
+        embeds: [{
+          title,
+          description: [promptLine, '', `${emoji} Skipped: ${parsed.skipReason ?? 'no reason given'}`].filter(Boolean).join('\n'),
+          color,
+          footer,
+        }],
+      };
+    }
+
+    // Build sections
+    // 构建各 section
+    const sections: string[] = [];
+    if (promptLine) sections.push(promptLine, '');
+    sections.push(`${emoji} ${parsed.taskCompletion ?? '(no details)'}`);
+
+    const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
+    if (issues.length > 0) {
+      sections.push('', '**Issues Found**');
+      for (const issue of issues) sections.push(`• ${issue}`);
+    }
+
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    if (suggestions.length > 0) {
+      sections.push('', '**Suggestions**');
+      for (const s of suggestions) sections.push(`• ${s}`);
+    }
+
+    let description = sections.join('\n');
+    if (description.length > 4000) description = description.slice(0, 4000) + '\n\n...(truncated)';
+
+    return { embeds: [{ title, description, color, footer }] };
   }
 
-  // Determine color from content
-  // 根据内容判断颜色
-  let color = EMBED_COLOR_WARN;
-  if (raw.includes('✅ Completed')) color = EMBED_COLOR_SUCCESS;
-  else if (raw.includes('❌ Not completed')) color = EMBED_COLOR_FAIL;
-  else if (raw.includes('⚠️ Partially')) color = EMBED_COLOR_WARN;
-
-  // Truncate description to Discord embed limit (4096 chars)
-  // 截断描述到 Discord embed 限制（4096 字符）
+  // JSON parse failed — fallback to raw text
+  // JSON 解析失败 — 回退到原始文本
   let description = [promptLine, '', raw].filter(Boolean).join('\n');
   if (description.length > 4000) description = description.slice(0, 4000) + '\n\n...(truncated)';
 
-  return {
-    embeds: [{
-      title,
-      description,
-      color,
-      footer,
-    }],
-  };
+  return { embeds: [{ title, description, color: EMBED_COLOR_WARN, footer }] };
 }
 
 /**
@@ -600,19 +662,19 @@ async function dispatchAnalysis(
   const message = [
     `## Instructions`,
     `You are an agent behavior analyst. Analyze the agent session below.`,
+    `Respond with a JSON object only, no other text. Schema:`,
     ``,
-    `If the session is casual chat, greeting, or simple Q&A with no meaningful tool calls, respond with ONLY: "⏭️ Skipped: [brief reason]".`,
+    `If the session is casual chat, greeting, or simple Q&A with no meaningful tool calls:`,
+    `{"status":"skipped","skipReason":"brief reason"}`,
     ``,
-    `Otherwise, respond with these sections (keep each bullet to one line):`,
+    `Otherwise:`,
+    `{"status":"completed|not_completed|partial","taskCompletion":"one sentence summary","issues":["issue 1","issue 2"],"suggestions":["fix 1","fix 2"]}`,
     ``,
-    `**Task Completion**`,
-    `[✅ Completed / ❌ Not completed / ⚠️ Partially completed]: [one sentence]`,
-    ``,
-    `**Issues Found**`,
-    `- [❌/⚠️] [issue, 1-4 items]`,
-    ``,
-    `**Suggestions**`,
-    `- [💡] [fix, 1-3 items]`,
+    `Rules:`,
+    `- status must be one of: completed, not_completed, partial, skipped`,
+    `- issues: 0-4 items, each one line`,
+    `- suggestions: 0-3 items, each one line`,
+    `- Respond with raw JSON only, no markdown fences, no extra text`,
     ``,
     `## Session`,
     `Agent: ${sessionKey}`,
