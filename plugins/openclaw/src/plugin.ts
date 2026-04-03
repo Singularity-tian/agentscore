@@ -132,6 +132,42 @@ function extractActions(messages?: AgentMessage[]): TaskSlice["actions"] {
 }
 
 /**
+ * Extract the last assistant text reply from a message list.
+ * 从消息列表中提取最后一条 assistant 文本回复。
+ */
+function extractLastAssistantReply(messages: AgentMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') {
+      const text = extractText(messages[i].content);
+      if (text?.trim()) return text.trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Format analysis agent output into a structured Discord message.
+ * If the output already contains expected sections, pass through.
+ * Otherwise, wrap in a minimal format.
+ * 将分析 agent 的输出格式化为结构化的 Discord 消息。
+ */
+function formatAnalysisOutput(raw: string): string {
+  // If agent output starts with ⏭️ (skipped), pass through as-is
+  // 如果 agent 输出以 ⏭️ 开头（跳过），直接透传
+  if (raw.startsWith('⏭️')) return raw;
+
+  // If agent output already contains expected sections, pass through
+  // 如果 agent 输出已包含预期 sections，直接透传
+  if (raw.includes('**Task Completion**') && raw.includes('**Issues Found**')) {
+    return raw;
+  }
+
+  // Otherwise, wrap the raw output in a minimal format
+  // 否则，用最小格式包装原始输出
+  return [`**Analysis**`, raw].join('\n\n');
+}
+
+/**
  * Serialize conversation history before the current task for analysis context.
  * Includes tool calls but truncates results to save tokens.
  * 将当前 task 之前的对话历史序列化为分析上下文。包含 tool call 但截断 result。
@@ -500,6 +536,10 @@ async function uploadBatchToRemote(
 /** Timeout for hooks dispatch — short since it's fire-and-forget. */
 const DISPATCH_TIMEOUT_MS = 10_000;
 
+/** Cache analysis headers by sessionKey so agent_end intercept can format output. */
+// 按 sessionKey 缓存分析 header，agent_end 拦截时用于格式化输出。
+const pendingAnalysisHeaders = new Map<string, string>();
+
 /**
  * Dispatch analysis request to a dedicated OpenClaw analysis agent via hooks API.
  * The analysis agent will review the session and post findings to Discord.
@@ -571,6 +611,19 @@ async function dispatchAnalysis(
     taskSlice.report || '(empty)',
   ].join('\n');
 
+  // Generate unique sessionKey and cache header for agent_end intercept
+  // 生成唯一 sessionKey 并缓存 header 供 agent_end 拦截使用
+  const monitorSessionKey = `subagent:ags-monitor:${Date.now()}`;
+  pendingAnalysisHeaders.set(monitorSessionKey, headerLine);
+
+  // Clean up stale entries older than 5 minutes to prevent memory leaks
+  // 清理超过 5 分钟的旧条目防止内存泄漏
+  const staleThreshold = Date.now() - 5 * 60 * 1000;
+  for (const [key] of pendingAnalysisHeaders) {
+    const ts = parseInt(key.split(':').pop() ?? '0', 10);
+    if (ts < staleThreshold) pendingAnalysisHeaders.delete(key);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
 
@@ -584,9 +637,9 @@ async function dispatchAnalysis(
       body: JSON.stringify({
         message,
         name: 'agentscore-analysis',
-        sessionKey: `ags-monitor:${Date.now()}`,
+        sessionKey: monitorSessionKey,
         wakeMode: 'now',
-        deliver: true,
+        deliver: false,
         channel: 'discord',
         to: discordChannelId,
       }),
@@ -712,13 +765,13 @@ export default {
             if (!(config as any).hooks.allowRequestSessionKey) {
               (config as any).hooks.allowRequestSessionKey = true;
               if (!Array.isArray((config as any).hooks.allowedSessionKeyPrefixes)) {
-                (config as any).hooks.allowedSessionKeyPrefixes = ['hook:', 'ags-monitor:'];
+                (config as any).hooks.allowedSessionKeyPrefixes = ['hook:', 'subagent:ags-monitor:'];
               } else {
                 if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('hook:')) {
                   (config as any).hooks.allowedSessionKeyPrefixes.push('hook:');
                 }
-                if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('ags-monitor:')) {
-                  (config as any).hooks.allowedSessionKeyPrefixes.push('ags-monitor:');
+                if (!(config as any).hooks.allowedSessionKeyPrefixes.includes('subagent:ags-monitor:')) {
+                  (config as any).hooks.allowedSessionKeyPrefixes.push('subagent:ags-monitor:');
                 }
               }
               needsRestart = true;
@@ -777,17 +830,42 @@ export default {
           `[agentscore] agent_end fired, sessionKey=${sessionKey}, success=${event.success}`,
         );
 
+        // Intercept analysis agent output: format and send to Discord (before success check)
+        // 拦截分析 agent 输出：格式化后发送到 Discord（在 success 检查之前）
+        if (sessionKey.includes("ags-monitor:")) {
+          if (cfg.analysisDiscordChannelId && event.messages?.length) {
+            // Retrieve cached header by stripping OpenClaw's "agent:main:" prefix
+            // 通过剥离 OpenClaw 的 "agent:main:" 前缀获取缓存的 header
+            const monitorKey = sessionKey.replace(/^agent:main:/, '');
+            const header = pendingAnalysisHeaders.get(monitorKey);
+            pendingAnalysisHeaders.delete(monitorKey);
+
+            const assistantReply = extractLastAssistantReply(event.messages as AgentMessage[]);
+            if (assistantReply) {
+              let finalMessage = header
+                ? `${header}\n\n${formatAnalysisOutput(assistantReply)}`
+                : formatAnalysisOutput(assistantReply);
+              // sendMessageDiscord() doesn't chunk internally — truncate to Discord's 2000 char limit
+              // sendMessageDiscord() 不会自动分片 — 截断到 Discord 2000 字符限制
+              if (finalMessage.length > 1900) finalMessage = finalMessage.slice(0, 1900) + '\n\n...(truncated)';
+              try {
+                await (api as any).runtime.channel.discord.sendMessageDiscord(
+                  cfg.analysisDiscordChannelId,
+                  finalMessage,
+                );
+              } catch (err) {
+                console.error('[agentscore] failed to send analysis to Discord:', (err as Error).message);
+              }
+            }
+          }
+          return;
+        }
+
         if (!event.success) return;
 
         // Skip internal temporary agents (e.g. slug-generator)
         // 跳过内部临时 agent（如 slug-generator）
         if (sessionKey.startsWith("temp:")) return;
-
-        // Skip AgentScore analysis agent sessions (prevent infinite loop)
-        // OpenClaw prefixes sessionKey with "agent:main:", so check with includes()
-        // 跳过 AgentScore 分析 agent 的 session（防止无限循环）
-        // OpenClaw 会给 sessionKey 加 "agent:main:" 前缀，所以用 includes() 检测
-        if (sessionKey.includes("ags-monitor:")) return;
 
         const now = Date.now();
         const last = lastUploadAt.get(sessionKey) ?? 0;
