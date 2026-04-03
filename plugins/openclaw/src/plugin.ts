@@ -146,21 +146,7 @@ function extractLastAssistantReply(messages: AgentMessage[]): string | null {
   return null;
 }
 
-// Discord embed color constants
-// Discord embed 颜色常量
-const EMBED_COLOR_SKIP = 0x808080;   // grey for skipped
-const EMBED_COLOR_SUCCESS = 0x22c55e; // green for completed
-const EMBED_COLOR_FAIL = 0xef4444;    // red for not completed
-const EMBED_COLOR_WARN = 0xeab308;    // yellow for partial / fallback
-
-const STATUS_COLOR_MAP: Record<string, number> = {
-  completed: EMBED_COLOR_SUCCESS,
-  not_completed: EMBED_COLOR_FAIL,
-  partial: EMBED_COLOR_WARN,
-  skipped: EMBED_COLOR_SKIP,
-};
-
-const STATUS_EMOJI_MAP: Record<string, string> = {
+const STATUS_EMOJI: Record<string, string> = {
   completed: '✅',
   not_completed: '❌',
   partial: '⚠️',
@@ -195,70 +181,55 @@ function parseAnalysisJson(raw: string): {
 }
 
 /**
- * Build a Discord embed object from analysis agent output + cached header info.
+ * Build a plain-text Discord message from analysis agent output + cached header info.
  * Attempts to parse JSON output; falls back to raw text on failure.
- * 根据分析 agent 的输出和缓存的 header 信息构建 Discord embed 对象。
+ * 根据分析 agent 的输出和缓存的 header 信息构建纯文本 Discord 消息。
  * 尝试解析 JSON 输出；失败时回退到原始文本。
  */
-function buildAnalysisEmbed(
+function formatAnalysisMessage(
   raw: string,
   headerInfo: { agentLabel: string; timeLabel: string; promptPreview: string } | null,
-): { embeds: unknown[] } {
-  const title = headerInfo ? `📋 ${headerInfo.agentLabel}` : '📋 Analysis';
-  const footer = headerInfo ? { text: headerInfo.timeLabel } : undefined;
-  const promptLine = headerInfo ? `> ${headerInfo.promptPreview}` : '';
+): string {
+  const headerBlock = headerInfo
+    ? `📋 **${headerInfo.agentLabel}** | ${headerInfo.timeLabel}\n> ${headerInfo.promptPreview}\n`
+    : '';
 
   const parsed = parseAnalysisJson(raw);
 
-  // JSON parse succeeded — build structured embed
-  // JSON 解析成功 — 构建结构化 embed
+  // JSON parse succeeded — build structured message
+  // JSON 解析成功 — 构建结构化消息
   if (parsed && typeof parsed.status === 'string') {
-    const color = STATUS_COLOR_MAP[parsed.status] ?? EMBED_COLOR_WARN;
-    const emoji = STATUS_EMOJI_MAP[parsed.status] ?? '📋';
+    const emoji = STATUS_EMOJI[parsed.status] ?? '📋';
 
-    // Skipped session
-    // 跳过的 session
     if (parsed.status === 'skipped') {
-      return {
-        embeds: [{
-          title,
-          description: [promptLine, '', `${emoji} Skipped: ${parsed.skipReason ?? 'no reason given'}`].filter(Boolean).join('\n'),
-          color,
-          footer,
-        }],
-      };
+      return `${headerBlock}${emoji} Skipped: ${parsed.skipReason ?? 'no reason given'}`;
     }
 
-    // Build sections
-    // 构建各 section
-    const sections: string[] = [];
-    if (promptLine) sections.push(promptLine, '');
-    sections.push(`${emoji} ${parsed.taskCompletion ?? '(no details)'}`);
+    const lines: string[] = [];
+    lines.push(`${headerBlock}${emoji} ${parsed.taskCompletion ?? '(no details)'}`);
 
     const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
     if (issues.length > 0) {
-      sections.push('', '**Issues Found**');
-      for (const issue of issues) sections.push(`• ${issue}`);
+      lines.push('', '**Issues**');
+      for (const issue of issues) lines.push(`• ${issue}`);
     }
 
     const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
     if (suggestions.length > 0) {
-      sections.push('', '**Suggestions**');
-      for (const s of suggestions) sections.push(`• ${s}`);
+      lines.push('', '**Suggestions**');
+      for (const s of suggestions) lines.push(`• ${s}`);
     }
 
-    let description = sections.join('\n');
-    if (description.length > 4000) description = description.slice(0, 4000) + '\n\n...(truncated)';
-
-    return { embeds: [{ title, description, color, footer }] };
+    let result = lines.join('\n');
+    if (result.length > 1900) result = result.slice(0, 1900) + '\n...(truncated)';
+    return result;
   }
 
   // JSON parse failed — fallback to raw text
   // JSON 解析失败 — 回退到原始文本
-  let description = [promptLine, '', raw].filter(Boolean).join('\n');
-  if (description.length > 4000) description = description.slice(0, 4000) + '\n\n...(truncated)';
-
-  return { embeds: [{ title, description, color: EMBED_COLOR_WARN, footer }] };
+  let result = `${headerBlock}${raw}`;
+  if (result.length > 1900) result = result.slice(0, 1900) + '\n...(truncated)';
+  return result;
 }
 
 /**
@@ -625,7 +596,7 @@ async function uploadBatchToRemote(
 }
 
 // ── Analysis dispatch ─────────────────────────────────────
-// ── 分析派发 ──────────────────────────────────────────────
+// ── 分析派发 ────────��─────────────────────────────────────
 
 /** Timeout for hooks dispatch — short since it's fire-and-forget. */
 const DISPATCH_TIMEOUT_MS = 10_000;
@@ -655,7 +626,7 @@ async function dispatchAnalysis(
   discordChannelId: string,
 ): Promise<void> {
   // Build fixed header: agent name | display name | time | prompt preview
-  // 构建固定头部：agent 名称 | 备注名 | 时间 | prompt 预览
+  // ���建固定头部：agent 名称 | 备注名 | 时间 | prompt 预览
   const agentLabel = channelName ? `${channelName} (${sessionKey})` : sessionKey;
   const timeLabel = new Date(taskSlice.startedAt).toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
   const promptPreview = taskSlice.prompt.slice(0, 50) + (taskSlice.prompt.length > 50 ? '...' : '');
@@ -933,12 +904,11 @@ export default {
 
             const assistantReply = extractLastAssistantReply(event.messages as AgentMessage[]);
             if (assistantReply) {
-              const embed = buildAnalysisEmbed(assistantReply, headerInfo);
+              const message = formatAnalysisMessage(assistantReply, headerInfo);
               try {
                 await (api as any).runtime.channel.discord.sendMessageDiscord(
                   cfg.analysisDiscordChannelId,
-                  '📋',
-                  embed,
+                  message,
                 );
               } catch (err) {
                 console.error('[agentscore] failed to send analysis to Discord:', (err as Error).message);
