@@ -937,7 +937,7 @@ export default {
               try {
                 await (api as any).runtime.channel.discord.sendMessageDiscord(
                   cfg.analysisDiscordChannelId,
-                  '',
+                  '📋',
                   embed,
                 );
               } catch (err) {
