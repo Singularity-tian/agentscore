@@ -145,26 +145,58 @@ function extractLastAssistantReply(messages: AgentMessage[]): string | null {
   return null;
 }
 
-/**
- * Format analysis agent output into a structured Discord message.
- * If the output already contains expected sections, pass through.
- * Otherwise, wrap in a minimal format.
- * 将分析 agent 的输出格式化为结构化的 Discord 消息。
- */
-function formatAnalysisOutput(raw: string): string {
-  // If agent output starts with ⏭️ (skipped), pass through as-is
-  // 如果 agent 输出以 ⏭️ 开头（跳过），直接透传
-  if (raw.startsWith('⏭️')) return raw;
+// Discord embed color constants
+// Discord embed 颜色常量
+const EMBED_COLOR_SKIP = 0x808080;   // grey for skipped
+const EMBED_COLOR_SUCCESS = 0x22c55e; // green for completed
+const EMBED_COLOR_FAIL = 0xef4444;    // red for not completed
+const EMBED_COLOR_WARN = 0xeab308;    // yellow for partial / fallback
 
-  // If agent output already contains expected sections, pass through
-  // 如果 agent 输出已包含预期 sections，直接透传
-  if (raw.includes('**Task Completion**') && raw.includes('**Issues Found**')) {
-    return raw;
+/**
+ * Build a Discord embed object from analysis agent output + cached header info.
+ * 根据分析 agent 的输出和缓存的 header 信息构建 Discord embed 对象。
+ */
+function buildAnalysisEmbed(
+  raw: string,
+  headerInfo: { agentLabel: string; timeLabel: string; promptPreview: string } | null,
+): { embeds: unknown[] } {
+  const title = headerInfo ? `📋 ${headerInfo.agentLabel}` : '📋 Analysis';
+  const footer = headerInfo ? { text: headerInfo.timeLabel } : undefined;
+  const promptLine = headerInfo ? `> ${headerInfo.promptPreview}` : '';
+
+  // Skipped session
+  // 跳过的 session
+  if (raw.startsWith('⏭️')) {
+    return {
+      embeds: [{
+        title,
+        description: [promptLine, '', raw].filter(Boolean).join('\n'),
+        color: EMBED_COLOR_SKIP,
+        footer,
+      }],
+    };
   }
 
-  // Otherwise, wrap the raw output in a minimal format
-  // 否则，用最小格式包装原始输出
-  return [`**Analysis**`, raw].join('\n\n');
+  // Determine color from content
+  // 根据内容判断颜色
+  let color = EMBED_COLOR_WARN;
+  if (raw.includes('✅ Completed')) color = EMBED_COLOR_SUCCESS;
+  else if (raw.includes('❌ Not completed')) color = EMBED_COLOR_FAIL;
+  else if (raw.includes('⚠️ Partially')) color = EMBED_COLOR_WARN;
+
+  // Truncate description to Discord embed limit (4096 chars)
+  // 截断描述到 Discord embed 限制（4096 字符）
+  let description = [promptLine, '', raw].filter(Boolean).join('\n');
+  if (description.length > 4000) description = description.slice(0, 4000) + '\n\n...(truncated)';
+
+  return {
+    embeds: [{
+      title,
+      description,
+      color,
+      footer,
+    }],
+  };
 }
 
 /**
@@ -536,9 +568,14 @@ async function uploadBatchToRemote(
 /** Timeout for hooks dispatch — short since it's fire-and-forget. */
 const DISPATCH_TIMEOUT_MS = 10_000;
 
-/** Cache analysis headers by sessionKey so agent_end intercept can format output. */
-// 按 sessionKey 缓存分析 header，agent_end 拦截时用于格式化输出。
-const pendingAnalysisHeaders = new Map<string, string>();
+/** Cached header info for analysis agent output formatting. */
+// 缓存的 header 信息，用于分析 agent 输出格式化。
+interface AnalysisHeaderInfo {
+  agentLabel: string;
+  timeLabel: string;
+  promptPreview: string;
+}
+const pendingAnalysisHeaders = new Map<string, AnalysisHeaderInfo>();
 
 /**
  * Dispatch analysis request to a dedicated OpenClaw analysis agent via hooks API.
@@ -560,30 +597,22 @@ async function dispatchAnalysis(
   const agentLabel = channelName ? `${channelName} (${sessionKey})` : sessionKey;
   const timeLabel = new Date(taskSlice.startedAt).toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
   const promptPreview = taskSlice.prompt.slice(0, 50) + (taskSlice.prompt.length > 50 ? '...' : '');
-  const headerLine = `📋 ${agentLabel} | ${timeLabel} UTC\n---\n"${promptPreview}"\n---`;
-
   const message = [
     `## Instructions`,
-    `You are an agent behavior analyst.`,
-    `Analyze the agent session below. Your response MUST follow this EXACT format (do not add or remove sections):`,
+    `You are an agent behavior analyst. Analyze the agent session below.`,
     ``,
-    headerLine,
+    `If the session is casual chat, greeting, or simple Q&A with no meaningful tool calls, respond with ONLY: "⏭️ Skipped: [brief reason]".`,
+    ``,
+    `Otherwise, respond with these sections (keep each bullet to one line):`,
     ``,
     `**Task Completion**`,
-    `[✅ Completed / ❌ Not completed / ⚠️ Partially completed]: [one sentence explaining what happened]`,
+    `[✅ Completed / ❌ Not completed / ⚠️ Partially completed]: [one sentence]`,
     ``,
     `**Issues Found**`,
-    `- [❌/⚠️] [issue description, one line each, 1-4 items]`,
+    `- [❌/⚠️] [issue, 1-4 items]`,
     ``,
     `**Suggestions**`,
-    `- [💡] [actionable fix, one line each, 1-3 items]`,
-    ``,
-    `Rules:`,
-    `- If the session is casual chat, greeting, or simple Q&A with no meaningful tool calls, respond with ONLY: "⏭️ Skipped: [brief reason]". Do not output the header or analysis sections.`,
-    `- Otherwise, follow the format above exactly. Do not deviate.`,
-    `- Each section must be present even if empty (write "None" if no issues/suggestions)`,
-    `- Keep each bullet to one line`,
-    `- The header block above must appear exactly as shown, do not modify it`,
+    `- [💡] [fix, 1-3 items]`,
     ``,
     `## Session`,
     `Agent: ${sessionKey}`,
@@ -614,7 +643,7 @@ async function dispatchAnalysis(
   // Generate unique sessionKey and cache header for agent_end intercept
   // 生成唯一 sessionKey 并缓存 header 供 agent_end 拦截使用
   const monitorSessionKey = `subagent:ags-monitor:${Date.now()}`;
-  pendingAnalysisHeaders.set(monitorSessionKey, headerLine);
+  pendingAnalysisHeaders.set(monitorSessionKey, { agentLabel, timeLabel: `${timeLabel} UTC`, promptPreview });
 
   // Clean up stale entries older than 5 minutes to prevent memory leaks
   // 清理超过 5 分钟的旧条目防止内存泄漏
@@ -830,28 +859,24 @@ export default {
           `[agentscore] agent_end fired, sessionKey=${sessionKey}, success=${event.success}`,
         );
 
-        // Intercept analysis agent output: format and send to Discord (before success check)
-        // 拦截分析 agent 输出：格式化后发送到 Discord（在 success 检查之前）
+        // Intercept analysis agent output: format as embed and send to Discord (before success check)
+        // 拦截分析 agent 输出：格式化为 embed 后发送到 Discord（在 success 检查之前）
         if (sessionKey.includes("ags-monitor:")) {
           if (cfg.analysisDiscordChannelId && event.messages?.length) {
             // Retrieve cached header by stripping OpenClaw's "agent:main:" prefix
             // 通过剥离 OpenClaw 的 "agent:main:" 前缀获取缓存的 header
             const monitorKey = sessionKey.replace(/^agent:main:/, '');
-            const header = pendingAnalysisHeaders.get(monitorKey);
+            const headerInfo = pendingAnalysisHeaders.get(monitorKey) ?? null;
             pendingAnalysisHeaders.delete(monitorKey);
 
             const assistantReply = extractLastAssistantReply(event.messages as AgentMessage[]);
             if (assistantReply) {
-              let finalMessage = header
-                ? `${header}\n\n${formatAnalysisOutput(assistantReply)}`
-                : formatAnalysisOutput(assistantReply);
-              // sendMessageDiscord() doesn't chunk internally — truncate to Discord's 2000 char limit
-              // sendMessageDiscord() 不会自动分片 — 截断到 Discord 2000 字符限制
-              if (finalMessage.length > 1900) finalMessage = finalMessage.slice(0, 1900) + '\n\n...(truncated)';
+              const embed = buildAnalysisEmbed(assistantReply, headerInfo);
               try {
                 await (api as any).runtime.channel.discord.sendMessageDiscord(
                   cfg.analysisDiscordChannelId,
-                  finalMessage,
+                  '',
+                  embed,
                 );
               } catch (err) {
                 console.error('[agentscore] failed to send analysis to Discord:', (err as Error).message);
