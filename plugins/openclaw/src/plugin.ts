@@ -191,7 +191,7 @@ function formatAnalysisMessage(
   headerInfo: { agentLabel: string; timeLabel: string; promptPreview: string } | null,
 ): string {
   const headerBlock = headerInfo
-    ? `📋 **${headerInfo.agentLabel}** | ${headerInfo.timeLabel}\n> ${headerInfo.promptPreview}\n`
+    ? `📋 **${headerInfo.agentLabel}**\n🕐 ${headerInfo.timeLabel}\n> ${headerInfo.promptPreview}\n`
     : '';
 
   const parsed = parseAnalysisJson(raw);
@@ -202,7 +202,7 @@ function formatAnalysisMessage(
     const emoji = STATUS_EMOJI[parsed.status] ?? '📋';
 
     if (parsed.status === 'skipped') {
-      return `${headerBlock}${emoji} Skipped: ${parsed.skipReason ?? 'no reason given'}`;
+      return `${headerBlock}${emoji} Skipped: ${parsed.skipReason ?? 'no reason given'}\n`;
     }
 
     const lines: string[] = [];
@@ -210,26 +210,26 @@ function formatAnalysisMessage(
 
     const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
     if (issues.length > 0) {
-      lines.push('', '**Issues**');
+      lines.push('', '❗ **Issues**');
       for (const issue of issues) lines.push(`• ${issue}`);
     }
 
     const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
     if (suggestions.length > 0) {
-      lines.push('', '**Suggestions**');
+      lines.push('', '💡 **Suggestions**');
       for (const s of suggestions) lines.push(`• ${s}`);
     }
 
     let result = lines.join('\n');
     if (result.length > 1900) result = result.slice(0, 1900) + '\n...(truncated)';
-    return result;
+    return result + '\n';
   }
 
   // JSON parse failed — fallback to raw text
   // JSON 解析失败 — 回退到原始文本
   let result = `${headerBlock}${raw}`;
   if (result.length > 1900) result = result.slice(0, 1900) + '\n...(truncated)';
-  return result;
+  return result + '\n';
 }
 
 /**
@@ -626,7 +626,7 @@ async function dispatchAnalysis(
   discordChannelId: string,
 ): Promise<void> {
   // Build fixed header: agent name | display name | time | prompt preview
-  // ���建固定头部：agent 名称 | 备注名 | 时间 | prompt 预览
+  // ������固定头部：agent 名称 | 备注名 | 时间 | prompt 预览
   const agentLabel = channelName ? `${channelName} (${sessionKey})` : sessionKey;
   const timeLabel = new Date(taskSlice.startedAt).toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
   const promptPreview = taskSlice.prompt.slice(0, 50) + (taskSlice.prompt.length > 50 ? '...' : '');
@@ -769,17 +769,17 @@ export default {
     // 跟踪每个 session 上次上传的 task 数量，只上传新增的 tasks
     const lastUploadedTaskCount = new Map<string, number>();
 
-    // Register /analysis-setup command for interactive configuration
-    // 注册 /analysis-setup 命令用于交互式配置
+    // Register /ags-setup command for interactive configuration
+    // 注册 /ags-setup 命令用于交互式配置
     (api as any).registerCommand({
-      name: 'analysis-setup',
+      name: 'ags-setup',
       description: 'Configure AgentScore analysis agent — set Discord channel for reports',
       acceptsArgs: true,
       handler: async (ctx: any) => {
         const args = ctx.args?.trim();
 
-        // /analysis-setup or /analysis-setup status — show current config
-        // /analysis-setup 或 /analysis-setup status — 显示当前配置
+        // /ags-setup or /ags-setup status — show current config
+        // /ags-setup 或 /ags-setup status — 显示当前配置
         if (!args || args === 'status') {
           const status = cfg.analysisDiscordChannelId
             ? `✅ Analysis enabled\n` +
@@ -788,13 +788,13 @@ export default {
               `  Discord channel: ${cfg.analysisDiscordChannelId}`
             : `❌ Analysis not configured\n\n` +
               `Usage:\n` +
-              `  /analysis-setup here — use current channel for reports\n` +
-              `  /analysis-setup status — show current config`;
+              `  /ags-setup here — use current channel for reports\n` +
+              `  /ags-setup status — show current config`;
           return { text: status };
         }
 
-        // /analysis-setup here — use current Discord channel, write to config
-        // /analysis-setup here — 使用当前 Discord channel，写入配置
+        // /ags-setup here — use current Discord channel, write to config
+        // /ags-setup here — 使用当前 Discord channel，写入配置
         if (args === 'here') {
           if (ctx.channelId !== 'discord') {
             return { text: '⚠️ This command only works in Discord channels.' };
@@ -878,7 +878,7 @@ export default {
           }
         }
 
-        return { text: `Unknown argument: ${args}\n\nUsage:\n  /analysis-setup — show status\n  /analysis-setup here — use current channel` };
+        return { text: `Unknown argument: ${args}\n\nUsage:\n  /ags-setup — show status\n  /ags-setup here — use current channel` };
       },
     });
 
