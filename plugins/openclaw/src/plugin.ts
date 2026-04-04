@@ -768,6 +768,9 @@ export default {
     // Track the last uploaded task count per session to only upload new tasks
     // 跟踪每个 session 上次上传的 task 数量，只上传新增的 tasks
     const lastUploadedTaskCount = new Map<string, number>();
+    // Track sessionId per sessionKey to detect session changes (e.g. cron creates new session each run)
+    // 按 sessionKey 跟踪 sessionId，检测 session 变化（如 cron 每次新建 session）
+    const lastUploadedSessionId = new Map<string, string>();
 
     // Register /ags-setup command for interactive configuration
     // 注册 /ags-setup 命令用于交互式配置
@@ -942,6 +945,16 @@ export default {
           return;
         }
 
+        // Detect session change (e.g. cron creates new session each run with same sessionKey)
+        // 检测 session 变化（如 cron 每次新建 session 但 sessionKey 不变）
+        const currentSessionId = ctx.sessionId ?? sessionKey;
+        const prevSessionId = lastUploadedSessionId.get(sessionKey);
+        if (prevSessionId && prevSessionId !== currentSessionId) {
+          // New session under same key — reset task count
+          // 同一个 key 下的新 session — 重置 task 计数
+          lastUploadedTaskCount.set(sessionKey, 0);
+        }
+
         // Only upload tasks that haven't been uploaded yet
         // 只上传尚未上传的新 tasks
         const previousCount = lastUploadedTaskCount.get(sessionKey) ?? 0;
@@ -961,6 +974,7 @@ export default {
         // 在异步上传前记录节流时间戳和 task 数量
         lastUploadAt.set(sessionKey, now);
         lastUploadedTaskCount.set(sessionKey, allTaskSlices.length);
+        lastUploadedSessionId.set(sessionKey, currentSessionId);
 
         // Extract channel name from first user message metadata (before it's stripped)
         // 从第一条用户消息的 metadata 中提取频道名称（在剥离前）
