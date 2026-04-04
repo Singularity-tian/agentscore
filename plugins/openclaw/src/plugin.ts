@@ -202,7 +202,7 @@ function formatAnalysisMessage(
     const emoji = STATUS_EMOJI[parsed.status] ?? '📋';
 
     if (parsed.status === 'skipped') {
-      return `${headerBlock}${emoji} Skipped: ${parsed.skipReason ?? 'no reason given'}\n`;
+      return `${headerBlock}${emoji} Skipped: ${parsed.skipReason ?? 'no reason given'}`;
     }
 
     const lines: string[] = [];
@@ -222,14 +222,14 @@ function formatAnalysisMessage(
 
     let result = lines.join('\n');
     if (result.length > 1900) result = result.slice(0, 1900) + '\n...(truncated)';
-    return result + '\n';
+    return result;
   }
 
   // JSON parse failed — fallback to raw text
   // JSON 解析失败 — 回退到原始文本
   let result = `${headerBlock}${raw}`;
   if (result.length > 1900) result = result.slice(0, 1900) + '\n...(truncated)';
-  return result + '\n';
+  return result;
 }
 
 /**
@@ -596,7 +596,7 @@ async function uploadBatchToRemote(
 }
 
 // ── Analysis dispatch ─────────────────────────────────────
-// ── 分析派发 ────────��─────────────────────────────────────
+// ── 分析派发 ────────��──────────────────────────────────���──
 
 /** Timeout for hooks dispatch — short since it's fire-and-forget. */
 const DISPATCH_TIMEOUT_MS = 10_000;
@@ -907,7 +907,9 @@ export default {
 
             const assistantReply = extractLastAssistantReply(event.messages as AgentMessage[]);
             if (assistantReply) {
-              const message = formatAnalysisMessage(assistantReply, headerInfo);
+              // Append separator for visual separation between consecutive messages
+              // 末尾追加分隔符，用于连续消息的视觉分隔
+              const message = `${formatAnalysisMessage(assistantReply, headerInfo)}\n➖➖➖`;
               try {
                 await (api as any).runtime.channel.discord.sendMessageDiscord(
                   cfg.analysisDiscordChannelId,
