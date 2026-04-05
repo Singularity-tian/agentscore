@@ -1,25 +1,35 @@
 # AgentScore
 
+> **Status: Maintenance Mode** — This project is feature-complete for its current scope. Bug fixes only; no new feature development.
+
 Alignment scoring engine for AI agents. Measures whether an agent did what it was told — and whether it told the truth about it.
 
 AgentScore compares **what the user asked** (prompt) → **what the agent did** (tool calls) → **what it claimed** (report), then produces alignment and truthfulness scores.
 
 ## How It Works
 
+### Deterministic Scoring
 1. **Parse** the user's prompt into imperative instructions and constraints
 2. **Match** each instruction to the agent's actual tool calls using TF-IDF similarity, entity overlap, and tool-verb mapping
 3. **Detect** unexpected actions and constraint violations
 4. **Verify** the agent's self-report against its real actions
 5. **Score** alignment (0–100) and truthfulness (0–100)
 
+### LLM-as-Judge Scoring
+For complex agent sessions where deterministic matching falls short, the core supports an LLM-based pipeline (`computeAlignmentLLM`) that:
+1. Extracts checkpoints from the prompt via LLM
+2. Verifies each checkpoint against the action log
+3. Checks constraint compliance
+4. Produces a final alignment score with detailed reasoning
+
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| [`@llmagentscore/core`](packages/core) | Scoring engine — pure functions, zero runtime deps |
-| [`@llmagentscore/cli`](packages/cli) | CLI for scoring sessions from the terminal |
-| [`@llmagentscore/sdk`](packages/sdk) | SDK for integrating scoring into custom agents |
-| [`@llmagentscore/agentscore-openclaw`](plugins/openclaw) | OpenClaw plugin |
+| Package | Version | Description |
+|---------|---------|-------------|
+| [`@llmagentscore/core`](packages/core) | 0.2.5 | Scoring engine — deterministic + LLM-as-judge |
+| [`@llmagentscore/cli`](packages/cli) | 0.1.0 | CLI for scoring sessions from the terminal |
+| [`@llmagentscore/sdk`](packages/sdk) | 0.1.0 | SDK for integrating scoring into custom agents |
+| [`@llmagentscore/agentscore-openclaw`](plugins/openclaw) | 0.1.18 | OpenClaw plugin — auto-scoring + Discord analysis agent |
 
 ## Quick Start
 
@@ -110,19 +120,7 @@ Once installed, configure your API key to enable dashboard uploads:
 openclaw config set plugins.entries.agentscore-openclaw.config.apiKey "sk-xxx"
 ```
 
-The plugin automatically scores every agent session on completion. See the [plugin README](plugins/openclaw) for all configuration options.
-
-### Express Middleware
-
-```typescript
-import { agentScoreMiddleware } from '@llmagentscore/sdk';
-
-app.use(agentScoreMiddleware({
-  extractPrompt: (req) => req.body?.prompt,
-  extractActions: (req) => req.body?.actions,
-  onScore: (score) => console.log('Alignment:', score.score),
-}));
-```
+The plugin automatically scores every agent session on completion. See the [plugin README](plugins/openclaw) for all configuration options including Discord analysis agent integration.
 
 ## Scoring
 
@@ -147,8 +145,9 @@ app.use(agentScoreMiddleware({
 ## Core API
 
 ```typescript
-import { computeAlignment, parsePrompt } from '@llmagentscore/core';
+import { computeAlignment } from '@llmagentscore/core';
 
+// Deterministic scoring
 const result = computeAlignment({
   prompt: 'Send an email to bob@example.com and search the web for weather',
   actions: [
@@ -164,26 +163,28 @@ const result = computeAlignment({
 // result.missed         → []
 // result.unexpected     → []
 // result.violations     → []
-// result.details        → "Overall Alignment: 100/100 ✅\n..."
+```
+
+```typescript
+import { scoreSession } from '@llmagentscore/core';
+
+// LLM-as-judge scoring (requires LLM provider)
+const result = await scoreSession({
+  prompt: '...',
+  actions: [...],
+  report: '...',
+  llmProvider: { apiKey: '...', model: 'claude-haiku-4-5' },
+});
 ```
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Build all packages
-npm run build
-
-# Run tests
-npm run test
-
-# Type check
-npm run typecheck
-
-# Dev mode (watch)
-npm run dev
+npm run build       # Build all packages
+npm run test        # Run tests
+npm run typecheck   # Type check
+npm run dev         # Dev mode (watch)
 ```
 
 ## Architecture
@@ -191,15 +192,15 @@ npm run dev
 ```
 agentscore/
 ├── packages/
-│   ├── core/           # Scoring engine (pure functions)
+│   ├── core/           # Scoring engine
 │   │   └── src/
 │   │       ├── parser/     # Prompt → instructions + constraints
-│   │       ├── scorer/     # Alignment, truthfulness, drift
+│   │       ├── scorer/     # Alignment (deterministic + LLM), truthfulness, drift
 │   │       └── utils/      # TF-IDF, entity extraction, tool-verb mapping
 │   ├── cli/            # Terminal commands (check, diff, drift, sync, watch)
 │   └── sdk/            # Session tracking, fetch interceptor, reporter, middleware
 └── plugins/
-    └── openclaw/       # OpenClaw plugin
+    └── openclaw/       # OpenClaw plugin (auto-scoring + analysis agent)
 ```
 
 ## License
